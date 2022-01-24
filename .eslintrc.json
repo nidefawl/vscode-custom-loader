@@ -1,0 +1,28 @@
+{
+  "env": {
+    "commonjs": true,
+    "es6": true,
+    "mocha": true,
+    "node": true,
+    "es2020": true,
+    "webextensions": true,
+    "browser": true,
+    "shared-node-browser": true,
+    "amd": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 11,
+    "sourceType": "module"
+  },
+  "extends": "eslint:recommended",
+  "rules": {
+    "no-const-assign": "warn",
+    "no-this-before-super": "warn",
+    "no-undef": "warn",
+    "no-unreachable": "warn",
+    "no-unused-vars": "off",
+    "constructor-super": "warn",
+    "valid-typeof": "warn",
+    "no-inner-declarations": "off"
+  }
+}

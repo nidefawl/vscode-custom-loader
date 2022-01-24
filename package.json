@@ -1,0 +1,27 @@
+{
+  "name": "vscode-custom-loader",
+  "workspaces": [
+    "extension",
+    "hook"
+  ],
+  "description": "VSCode Custom Loader Project",
+  "author": "nidefawl",
+  "license": "MIT",
+  "version": "0.0.3",
+  "private": true,
+  "repository-todo": {
+    "type": "git",
+    "url": "https://github.com/nidefawl/xxxx"
+  },
+  
+  "scripts": {
+    "lint": "eslint .",
+    "dist": "cd extension && vsce package --pre-release --no-git-tag-version --yarn --no-dependencies -o ../dist 0.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "14.x",
+    "@types/vscode": "^1.63.1",
+    "eslint": "^8.7.0",
+    "typescript": "^4.5.5"
+  }
+}

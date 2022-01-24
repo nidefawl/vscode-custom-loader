@@ -1,0 +1,98 @@
+{
+  "name": "vscode-custom-loader",
+  "displayName": "VS Code Custom Loader",
+  "description": "Allow loading custom JS and CSS into Main and Renderer Process",
+  "author": "nidefawl",
+  "publisher": "nidefawl",
+  "license": "MIT",
+  "version": "0.0.3",
+  "private": true,
+  "repository-todo": {
+    "type": "git",
+    "url": "https://github.com/nidefawl/xxxx"
+  },
+  "homepage-todo": "https://github.com/nidefawl/xxxx",
+  "main": "vscode-cl-extension.js",
+  "engines": {
+    "vscode": "^1.63.0"
+  },
+  "categories": [
+    "Other",
+    "UI"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscode-custom-loader.helloWorld",
+        "title": "vscode-custom-loader test command"
+      }
+    ],
+    "configuration": [
+      {
+        "type": "object",
+        "title": "VSCode Custom Loader",
+        "properties": {
+          "vscodecustomloader": {
+            "type": "object",
+            "required": [
+              "modulelist"
+            ],
+            "title": "VSCode Custom Loader",
+            "markdownDescription": "",
+            "properties": {
+              "modulelist": {
+                "type": "array",
+                "title": "Module List",
+                "markdownDescription": "Modules to load in renderer (js/css)\n\n***Workspace configuration is not supported***\n\nVS Code does not load Workspace configurations in the Main Process. Only the local user configuration is applied",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "path",
+                    "modules"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "title": "Module directory",
+                      "markdownDescription": "Absolute path of a directory to load modules from"
+                    },
+                    "modules": {
+                      "type": "array",
+                      "title": "Module List",
+                      "markdownDescription": "Definition of all modules to load in the defined path",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "module",
+                          "file"
+                        ],
+                        "properties": {
+                          "module": {
+                            "type": "string",
+                            "title": "Module Name",
+                            "markdownDescription": "The module name must contain at least one slash to distinguish it from node internal modules.\n\nModule names must be unique and not clash with VSCode internal module names.\n\n i.e. 'mylib/mymodule'"
+                          },
+                          "file": {
+                            "type": "string",
+                            "title": "Module Filename",
+                            "markdownDescription": "The filename cannot contain a directory and must have the extension.\n\ni.e. 'main.js' or 'style.css'"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "devDependencies": {
+    "vsce": "^2.6.3"
+  }
+}

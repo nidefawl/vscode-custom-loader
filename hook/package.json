@@ -1,0 +1,9 @@
+{
+  "name": "vscode-custom-loader-hook",
+  "description": "npm module providing hooks used by VSCode Custom Loader extension",
+  "author": "nidefawl",
+  "license": "MIT",
+  "version": "0.0.3",
+  "private": true,
+  "main": "hook.js"
+}
