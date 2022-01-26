@@ -114,32 +114,50 @@ async function activate(context) {
 
   let cmdDispPick = commands.registerCommand(`backgroundimage.cmd.pickimage`, async () => {
     return readDirectoryImagelist(async (filenamesFound, imgFolderUri) => {
-        const dlgOptions = {
-          title: 'Select Background Image',
-          placeHolder: 'Select Background Image',
-          onDidSelectItem: async (picked) => {
-            if (typeof(picked) === 'string' && picked.length) {
-              const rpc = await lazyGetRPCChannel();
-              rpc.send('background', 'set', Uri.joinPath(imgFolderUri, picked).fsPath);
-            }
-          }
-        };
-        const backgroundImageCurrent = workspace.getConfiguration().get('backgroundimage.image');
-        return window.showQuickPick(filenamesFound, dlgOptions).then(async (picked) => {
-          let imagePicked = null;
-          if (typeof (picked) === 'string') {
-            imagePicked = picked;
-
-          } else {
-            imagePicked = backgroundImageCurrent;
-          }
-          if (typeof(imagePicked) === 'string' && imagePicked.length) {
-            const imageUri = Uri.joinPath(imgFolderUri, imagePicked);
-            setImageAndUpdateConfig(imageUri.fsPath);
-            return imageUri.fsPath;
-          }
+      const backgroundImageCurrent = workspace.getConfiguration().get('backgroundimage.image', undefined);
+      const currentDesc = backgroundImageCurrent ? `Current: ${backgroundImageCurrent}` : undefined;
+      const clearDesc = `No background image`;
+      const setImageFromPick = async (...args) => {
+        const isPreview = args[0];
+        const picked = args[1];
+        const wsConfig = workspace.getConfiguration();
+        const rpc = await lazyGetRPCChannel();
+        if (picked == clearDesc) {
+          if (!isPreview)
+            wsConfig.update('backgroundimage.enabled', false);
+          rpc.send('background', 'enable', false);
           return undefined;
-        });
+        }
+        if (typeof(picked) === 'string' && picked.length && picked !== currentDesc) {
+          if (!isPreview)
+            wsConfig.update('backgroundimage.enabled', true);
+          rpc.send('background', 'enable', true);
+          const imageUri = Uri.joinPath(imgFolderUri, picked);
+          if (!isPreview)
+            setImageAndUpdateConfig(imageUri.fsPath);
+          else
+           rpc.send('background', 'set', imageUri.fsPath);
+          return imageUri.fsPath;
+        }
+        if (currentDesc && typeof(backgroundImageCurrent) === 'string' && backgroundImageCurrent.length) {
+          if (!isPreview)
+            wsConfig.update('backgroundimage.enabled', true);
+          rpc.send('background', 'enable', true);
+          rpc.send('background', 'set', backgroundImageCurrent);
+          return backgroundImageCurrent;
+        }
+        rpc.send('background', 'enable', false);
+        return undefined;
+      };
+      const dlgOptions = {
+        title: 'Select Background Image',
+        placeHolder: 'Select Background Image',
+        onDidSelectItem: setImageFromPick.bind(null, true)
+      };
+      const quickPickList = [];
+      if (currentDesc) quickPickList.push(currentDesc);
+      quickPickList.push(clearDesc, ...filenamesFound);
+      return window.showQuickPick(quickPickList, dlgOptions).then(setImageFromPick.bind(null, false));
     });
   }, this);
   let cmdDispSetFolder = commands.registerCommand(`backgroundimage.cmd.setfolder`, async () => {
