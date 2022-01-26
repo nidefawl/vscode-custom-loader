@@ -50,7 +50,7 @@ class RPCChannelHandler_ExtHost {
       }
     }
     logChannel?.appendLine("RPC Message has not been handled")
-    console.warn('$recv', 'Message has not been handled', args);
+    console.warn('$recv', 'Message has not been handled', args, this.channels);
     return "Message has not been handled";
   }
   /* Outgoing */
@@ -126,10 +126,30 @@ class VsCodeCustomizeExtension {
       //TODO register disposable to handle extension host exit
       // rpcProtocol._register({dispose: ()=>{}});
       this.rpcChannelHandler = new RPCChannelHandler_ExtHost(rpcProtocol);
+
+      let timeout = setTimeout(() => {
+        const msg = 'Custom Loader hook is not installed.\n\nPlease patch bootstrap-window.js';
+        extensionLog(msg);
+          vscode.window.showInformationMessage(msg);
+        }, 12000);
+        this.rpcChannelHandler.registerChannelHandler('customloader', {
+        recv: function(args) {
+          if (args[1] == 'init') {
+            if (timeout) {
+              clearTimeout(timeout);
+              timeout = null;
+            }
+            // extensionLog('Custom Loader received init');
+            this.send('initreply');
+          }
+        }
+      });
+
       // don't swap next 2 calls!
       rpcProtocol.set(getOrRegisterProxyIdentifier(), this.rpcChannelHandler);
       const rpcHandlerProxy = rpcProtocol.getProxy(getOrRegisterProxyIdentifier());
       this.rpcChannelHandler.setProxy(rpcHandlerProxy);
+
   }
 
 
@@ -145,22 +165,33 @@ class VsCodeCustomizeExtension {
   }
 
   registerContribution(srcExtId, moduleList) {
-    extensionLog(`registerContribution from ${srcExtId}`);
     let apiReg = this.ctxt.globalState.get(__CONTRIB_REG_NAME, []);
     let extReg = apiReg.find((v)=>v.id==srcExtId);
+    let modified = false;
     if (extReg) {
+      modified = JSON.stringify(extReg.modules) !== JSON.stringify(moduleList);
       extReg.modules = moduleList;
     } else {
+      modified = true;
       extReg = {id: srcExtId, enabled: true, errors: undefined, modules: moduleList}
       apiReg.push(extReg);
     }
     this.ctxt.globalState.update(__CONTRIB_REG_NAME, apiReg);
+    if (modified) {
+      extensionLog(`registerContribution from ${srcExtId}`);
+      vscode.window.showInformationMessage('New extension registered\nPlease reload the window', {}, 'Reload window', 'Ignore').
+        then((response)=>{
+          if (response == 'Reload window') {
+            return vscode.commands.executeCommand('workbench.action.reloadWindow');
+          }
+        });
+    }
   }
   unregisterContributions(srcExtId) {
     extensionLog(`unregisterContribution from ${srcExtId}`);
     const apiReg = this.ctxt.globalState.get(__CONTRIB_REG_NAME);
     delete apiReg[srcExtId];
-    this.ctxt.globalState.set(__CONTRIB_REG_NAME, apiReg);
+    this.ctxt.globalState.update(__CONTRIB_REG_NAME, apiReg);
   }
 }
 

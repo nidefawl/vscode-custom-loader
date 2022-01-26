@@ -37,11 +37,13 @@ async function activate(context) {
   }
   async function readDirectoryImagelist(cb) {
     const wsConfig = workspace.getConfiguration();
-    let imagefolder = wsConfig.get('backgroundimage.folder');
-    if (typeof (imagefolder) !== 'string') {
+    let imagefolder = wsConfig.get('backgroundimage.folder', undefined);
+    if (typeof (imagefolder) !== 'string' || !imagefolder.length) {
       const result = await window.showInformationMessage('Please configure image folder', {}, 'Set image folder', 'Ignore');
       if (result === 'Set image folder') {
-        imagefolder = commands.executeCommand('backgroundimage.cmd.setfolder');
+        imagefolder = await commands.executeCommand('backgroundimage.cmd.setfolder');
+      } else {
+        return undefined;
       }
     }
     let imgFolderUri = undefined;
@@ -49,7 +51,7 @@ async function activate(context) {
       imgFolderUri = Uri.file(imagefolder);
     }
     if (!imgFolderUri) {
-      return;
+      return undefined;
     }
     return workspace.fs.readDirectory(imgFolderUri).then(async (namesTypes) => {
       const filenamesFound = namesTypes
@@ -84,10 +86,8 @@ async function activate(context) {
   }
   async function setImageAndUpdateConfig(absPath) {
     const rpc = await lazyGetRPCChannel();
-    rpc.send('background', 'set', absPath);
-    workspace.getConfiguration().update('backgroundimage.image', absPath);
+    await workspace.getConfiguration().update('backgroundimage.image', absPath);
   }
-
   let cmdDisp1 = commands.registerCommand(`backgroundimage.cmd.register`, async () => {
     const instance = await getLoaderAPI();
     instance.registerContribution(context.extension.id, moduleList)
@@ -107,9 +107,7 @@ async function activate(context) {
   let cmdDispToggle = commands.registerCommand(`backgroundimage.cmd.toggle`, async () => {
     const wsConfig = workspace.getConfiguration();
     let enabled = !wsConfig.get('backgroundimage.enabled', true);
-    wsConfig.update('backgroundimage.enabled', enabled);
-    const rpc = await lazyGetRPCChannel();
-    rpc.send('background', 'enable', enabled);
+    await wsConfig.update('backgroundimage.enabled', enabled);
   }, this);
 
   let cmdDispPick = commands.registerCommand(`backgroundimage.cmd.pickimage`, async () => {
@@ -124,25 +122,28 @@ async function activate(context) {
         const rpc = await lazyGetRPCChannel();
         if (picked == clearDesc) {
           if (!isPreview)
-            wsConfig.update('backgroundimage.enabled', false);
-          rpc.send('background', 'enable', false);
+            await wsConfig.update('backgroundimage.enabled', false);
+          else
+            rpc.send('background', 'enable', false);
           return undefined;
         }
         if (typeof(picked) === 'string' && picked.length && picked !== currentDesc) {
           if (!isPreview)
-            wsConfig.update('backgroundimage.enabled', true);
-          rpc.send('background', 'enable', true);
+            await wsConfig.update('backgroundimage.enabled', true);
+          else
+            rpc.send('background', 'enable', true);
           const imageUri = Uri.joinPath(imgFolderUri, picked);
           if (!isPreview)
             setImageAndUpdateConfig(imageUri.fsPath);
           else
-           rpc.send('background', 'set', imageUri.fsPath);
+            rpc.send('background', 'set', imageUri.fsPath);
           return imageUri.fsPath;
         }
         if (currentDesc && typeof(backgroundImageCurrent) === 'string' && backgroundImageCurrent.length) {
           if (!isPreview)
-            wsConfig.update('backgroundimage.enabled', true);
-          rpc.send('background', 'enable', true);
+            await wsConfig.update('backgroundimage.enabled', true);
+          else
+            rpc.send('background', 'enable', true);
           rpc.send('background', 'set', backgroundImageCurrent);
           return backgroundImageCurrent;
         }
@@ -185,7 +186,7 @@ async function activate(context) {
     });
   }, this);
 
-  context.subscriptions.push(cmdDisp1, cmdDisp2, cmdDispPrev, cmdDispNext, cmdDispToggle, cmdDispPick, cmdDispSetFolder);
+  context.subscriptions.push(cmdDispPrev, cmdDispNext, cmdDispToggle, cmdDispPick, cmdDispSetFolder);
 
   let btn1 = window.createStatusBarItem("backgroundimage.statusbar.prev", vscode.StatusBarAlignment.Right, 5);
   let btn2 = window.createStatusBarItem("backgroundimage.statusbar.toggle", vscode.StatusBarAlignment.Right, 4);
@@ -211,6 +212,27 @@ async function activate(context) {
     element.show();
   });
 
+
+  workspace.onDidChangeConfiguration(evt => {
+    if (evt.affectsConfiguration('backgroundimage.folder')) {
+      cachedImageList = null;
+    }
+    if (evt.affectsConfiguration('backgroundimage.enabled')) {
+      lazyGetRPCChannel().then(rpc=>{
+        rpc.send('background', 'enable', workspace.getConfiguration().get('backgroundimage.enabled', true));
+      });
+    }
+    if (evt.affectsConfiguration('backgroundimage.image')) {
+      const backgroundImageCurrent = workspace.getConfiguration().get('backgroundimage.image', null);
+      if (typeof (backgroundImageCurrent) === 'string' && backgroundImageCurrent.length) {
+        lazyGetRPCChannel().then(rpc=>{
+          rpc.send('background', 'set', backgroundImageCurrent);
+        });
+      }
+    }
+  }, this, context.subscriptions);
+  const instance = await getLoaderAPI();
+  instance.registerContribution(context.extension.id, moduleList)
 
   lazyGetRPCChannel().then(rpc=>{
     const wsConfig = workspace.getConfiguration();

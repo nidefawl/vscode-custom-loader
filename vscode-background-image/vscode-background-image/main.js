@@ -72,31 +72,35 @@ const BackgroundImage = (_ => {
           Helpers.setStylesheetsAttrEnabled(requiredCssFiles, stylesheetsEnabled);
         }
       }
-      setImage(imgFilePath) {
+      setImage(imagePath) {
         if (stylesheetsEnabled !== isEnabled) {
           stylesheetsEnabled = isEnabled;
           Helpers.setStylesheetsAttrEnabled(requiredCssFiles, stylesheetsEnabled);
         }
-        console.warn('setImage', imgFilePath);
-        customBgConfig.currentImage.fp = imgFilePath;
-        const fileUri = FileAccess.asBrowserUri(URI.file(imgFilePath));
-        customBgConfig.currentImage.url = fileUri;
+        customBgConfig.currentImage.fp = imagePath;
+        
+        if (/^https?:/.test(imagePath)) {
+          customBgConfig.currentImage.url = imagePath;
+        } else {
+          const fileUri = FileAccess.asBrowserUri(URI.file(imagePath));
+          customBgConfig.currentImage.url = fileUri.toString(false);
+        }
 
         var newStyle = "";
         if (customBgConfig.loadWithReadFile) {
 
-          console.log("readFileSync", imgFilePath);
+          console.log("readFileSync", imagePath);
 
-          const buf = fs.readFileSync(imgFilePath);
+          const buf = fs.readFileSync(imagePath);
           const base64Img = Helpers.toBase64(buf);
 
           var fileType = "jpg";
-          if (imgFilePath.endsWith(".png")) {
+          if (imagePath.endsWith(".png")) {
             fileType = "png";
           }
           newStyle = "background: url(data:image/" + fileType + ";base64," + base64Img + ") " + customBgConfig.backgroundImageCssRule;
         } else {
-          newStyle = "background: url(" + fileUri.toString(false) + ") " + customBgConfig.backgroundImageCssRule;
+          newStyle = "background: url(" + customBgConfig.currentImage.url + ") " + customBgConfig.backgroundImageCssRule;
         }
 
         Helpers.findStyleSheet("ws-background-image.css", function (styleSheet) {

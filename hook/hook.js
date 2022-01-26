@@ -274,14 +274,17 @@ class VSCodeHook extends Log {
 
 
 function loadCustomModules(log, vsAmdLoader, cfgModuleList, contribBaseUri) {
-  log.warn('loadCustomModules', cfgModuleList);
 
   const lcfg = vsAmdLoader.getConfig();
 
-  // modify amdModulesPattern
-  if (!lcfg.isPatched) {
+
+  if (!lcfg.isPatched) { // modify loader config only if we actually end up loading something
+
+    // add vscode-file:// scheme to loaders regex so we don't have to calculate relative urls for all files as workaround
     AMDLoader.Utilities.isAbsolutePath=(url)=>/^((http:\/\/)|(https:\/\/)|(file:\/\/)|(vscode-file:\/\/)|(\/))/.test(url)
+    // modify amdModulesPattern: allow loading modules with names other than 'vs/.*'
     lcfg.amdModulesPattern = new RegExp(lcfg.amdModulesPattern.source.concat('|(^.*[/].*$)'));
+    // don't run this twice
     lcfg.isPatched = true;
   }
 
@@ -299,13 +302,17 @@ function loadCustomModules(log, vsAmdLoader, cfgModuleList, contribBaseUri) {
 
     let moduleName;
     if (parsedPath.ext === '.css') {
+      /* Path mapping for CSS files is handled differently: Prefixed with vs/css!, and filenames without extension */
       const fileUri = FileAccess.asBrowserUri(URI.joinPath(baseUri, parsedPath.dir, parsedPath.name));
       moduleName = `vs/css!${fileUri.toString(true)}`;
     } else {
       const fileUri = FileAccess.asBrowserUri(URI.joinPath(baseUri, parsedPath.dir, parsedPath.base));
       const moduleDirUri = FileAccess.asBrowserUri(URI.joinPath(baseUri, parsedPath.dir))
       moduleName = `${parsedPath.dir}/${parsedPath.name}`;
+
       loadModulesPaths[moduleName] = fileUri.toString(true);
+
+      /* set additional info provided by module.config() inside the loaded modules */
       loadModulesCfg[moduleName] = {
         name: moduleName,
         file: filename,
@@ -318,15 +325,23 @@ function loadCustomModules(log, vsAmdLoader, cfgModuleList, contribBaseUri) {
 
   }
 
+  /**
+   * 'path: ' configure modulename to filepath mapping
+   * 'config: ' options isn't strictly required, but provides loaded modules with additional
+   * info available thru module.config()
+   *
+   * AMD loader config auto merges this config with its existing configuration. neat.
+   */
   vsAmdLoader.config({
     paths: loadModulesPaths,
     config: loadModulesCfg,
   });
 
+  /* trigger loading by passing the list of module names to the require func */
   vsAmdLoader(
     loadModuleNames,
     function (...modulesLoaded) {
-      log.log('modules loaded', modulesLoaded);
+      // log.log('modules loaded', modulesLoaded);
     }, undefined);
 }
 
@@ -336,7 +351,7 @@ async function loadContribRegistryModules(log, vsAmdLoader, contribRegistry, ext
       if (contrib.id && contrib.enabled && contrib.modules) {
         const extension = await extensionService.getExtension(contrib.id);
         if (extension) {
-          log.warn('loading custom modules contributed by', contrib.id);
+          log.log(`Loading ${contrib.modules.length} modules contributed by ${contrib.id}`);
           loadCustomModules(log, vsAmdLoader, contrib.modules, extension.extensionLocation);
         }
       }
@@ -363,123 +378,32 @@ exports.bootstrapWindow = () => {
   const vscHook = new VSCodeHook(processType, globalObj.require, globalObj);
 
   let resolveRpcHandler;
-  /* 
+  /*
    * global CustomLoaderRPC allows renderer code to install a RPC handler
    * for commmunication with the extension in extension host process.
    * maybe this should be a module that needs to be imported.
-   * But this works for now 
+   * But this works for now
    */
   globalObj.CustomLoaderRPC = new Promise(resolve=>resolveRpcHandler = resolve);
 
-  if (processType == PROC_RENDER) {
 
-    /* Load contributions from global storage and load their registered modules */
-    vscHook.require(['StorageService', 'ExtensionService'])
-      .then(async (services) => {
-        const [storageService, extensionService] = services;
-        let extStateJson = null;
-        try {
-          /* Wait for database to load */
-          await storageService.initializationPromise;
+  /**
+   * Step 1: Wait for StorageService and ExtensionService to be instantiated
+   * Step 2: Install RPC handler for communication: renderer <-> extension host
+   * Step 3: Load contributions from global storage, see which extension are enabled
+   *         then load the modules registered to each extension.
+   */
+  vscHook.require(['StorageService', 'ExtensionService'])
+    .then(async (services) => {
+      const [storageService, extensionService] = services;
+      let extStateJson = null;
+      try {
 
-          /* StorageService global storage allows access to extensions 'Mementos'     */
-          extStateJson = storageService.globalStorage.get('nidefawl.vscode-custom-loader', undefined);
-
-          if (extStateJson !== undefined) {
-            const extState = JSON.parse(extStateJson);
-            const contribRegistry = extState[__CONTRIB_REG_NAME] || [];
-            loadContribRegistryModules(vscHook, vscHook.vsAmdLoader, contribRegistry, extensionService);
-          }
-        } catch(error) {
-          vscHook.logErr(error, extStateJson);
-        }
-      });
-
-    /* workaround for 'did-finish-load' firing early bug. Fix is already upstream on microsoft/vscode git */
-    vscHook.require(['LifecycleService', 'NativeHostService']).then((services) => {
-        const [lifecycleService, nativeHostService] = services;
-        lifecycleService.when(4).then(_ => {
-          // workaround for 'did-finish-load' firing early bug
-          nativeHostService.notifyReady()
-        });
-      });
-
-
-    // BEGIN renderer <-> extension host RPC
-
-    /**
-     * Basic RPC handler.
-     * Will be registered to ID created by getOrRegisterProxyIdentifier
-     * Interface must be identical for registered proxy identifier IDs
-     */
-    const rendererRpcHandler = new class RPCChannelHandler_Renderer {
-      constructor() {
-        this.log = new Log(getCurrentProcName(processType), 'RPCChannelHandler');
-        this.channels = {};
-      }
-      setProxy(rpcHandlerProxy) {
-        this.rpcHandlerProxy = rpcHandlerProxy;
-      }
-      registerChannelHandler(srcExtId, handler) {
-        handler['send'] = (...args) => this.send([srcExtId, ...args]);
-        this.channels[srcExtId] = handler;
-      }
-      uregisterChannels(srcExtId) {
-        this.channels[srcExtId] = undefined;
-      }
-      /* Incoming */
-      $recv(args) {
-        if (args.length) {
-          const chan = this.channels[args[0]];
-          if (chan) {
-            return chan.recv(args);
-          }
-        }
-        this.log.warn('$recv', 'Message has not been handled', args);
-        return "Message has not been handled";
-      }
-      /* Outgoing */
-      send(args) {
-        return this.rpcHandlerProxy.$recv(args);
-      }
-    };
-
-    /**
-     * must not be called before extension host was created.
-     * returns same identifier on subsequent calls
-     */
-    const getOrRegisterProxyIdentifier = (() => {
-      let registeredProxyIdentifier = null;
-      function getOrRegister() {
-        const {ProxyIdentifier} = vscHook.vsAmdLoader('vs/workbench/services/extensions/common/proxyIdentifier');
-        if (!registeredProxyIdentifier) {
-          registeredProxyIdentifier = new ProxyIdentifier(true, 'customLoader');
-        }
-        return registeredProxyIdentifier;
-      }
-      return getOrRegister;
-    })();
-
-    function installRpc(rpcProtocol) {
-      //TODO register disposable to handle extension host exit
-      // _rpcProtocol._register({dispose: ()=>{}});
-
-      rpcProtocol.set(getOrRegisterProxyIdentifier(), rendererRpcHandler);
-      const rpcHandlerProxy = rpcProtocol.getProxy(getOrRegisterProxyIdentifier());
-      rendererRpcHandler.setProxy(rpcHandlerProxy);
-      // rendererRpcHandler.send(['Init message from renderer', Math.random()]);
-      resolveRpcHandler(rendererRpcHandler);
-    }
-
-
-    /* Install rpc handler for communication: renderer <-> extension host */
-    vscHook.require(['ExtensionService']).then((services) => {
-        const [extensionService] = services;
-        let subscr = null;
         //TODO handle extension host reloads
         //TODO handle extension enable/disable changes
 
         // sadly there is no onExtensionHostStarted event (for the local ext host)
+        let subscr = null;
         subscr = extensionService.onDidChangeExtensionsStatus((extensionIds)=>{
 
           const extHostManager = extensionService._getExtensionHostManager(0); // 0 == LocalProcess
@@ -500,8 +424,127 @@ exports.bootstrapWindow = () => {
             }
           }
         });
+
+
+        /* Wait for database to load */
+        await storageService.initializationPromise;
+
+        /* StorageService global storage allows access to extensions 'Mementos'     */
+        extStateJson = storageService.globalStorage.get('nidefawl.vscode-custom-loader', undefined);
+
+        if (extStateJson !== undefined) {
+          const extState = JSON.parse(extStateJson);
+          const contribRegistry = extState[__CONTRIB_REG_NAME] || [];
+          loadContribRegistryModules(vscHook, vscHook.vsAmdLoader, contribRegistry, extensionService);
+        }
+
+      } catch(error) {
+        vscHook.logErr(error, extStateJson);
+      }
+    });
+
+  /* workaround for 'did-finish-load' firing early bug. Fix is already upstream on microsoft/vscode git */
+  vscHook.require(['LifecycleService', 'NativeHostService']).then((services) => {
+      const [lifecycleService, nativeHostService] = services;
+      lifecycleService.when(4).then(_ => {
+        // workaround for 'did-finish-load' firing early bug
+        nativeHostService.notifyReady()
       });
+    });
+
+
+  // BEGIN renderer <-> extension host RPC
+
+  /**
+   * Basic RPC handler.
+   * Will be registered to ID created by getOrRegisterProxyIdentifier
+   * Interface must be identical for registered proxy identifier IDs
+   */
+  const rendererRpcHandler = new class RPCChannelHandler_Renderer {
+    constructor() {
+      this.log = new Log(getCurrentProcName(processType), 'RPCChannelHandler');
+      this.channels = {};
+      this.initialized = false;
+    }
+    setProxy(rpcHandlerProxy) {
+      this.rpcHandlerProxy = rpcHandlerProxy;
+    }
+    registerChannelHandler(srcExtId, handler) {
+      handler['send'] = (...args) => this.send([srcExtId, ...args]);
+      this.channels[srcExtId] = handler;
+    }
+    uregisterChannels(srcExtId) {
+      this.channels[srcExtId] = undefined;
+    }
+    /* Incoming */
+    $recv(args) {
+      if (args.length) {
+        const chan = this.channels[args[0]];
+        if (chan) {
+          return chan.recv(args);
+        }
+      }
+      this.log.warn('$recv', 'Message has not been handled', args);
+      return "Message has not been handled";
+    }
+    /* Outgoing */
+    send(args) {
+      return this.rpcHandlerProxy.$recv(args);
+    }
+  };
+
+  /**
+   * must not be called before extension host was created.
+   * returns same identifier on subsequent calls
+   */
+  const getOrRegisterProxyIdentifier = (() => {
+    let registeredProxyIdentifier = null;
+    function getOrRegister() {
+      const {ProxyIdentifier} = vscHook.vsAmdLoader('vs/workbench/services/extensions/common/proxyIdentifier');
+      if (!registeredProxyIdentifier) {
+        registeredProxyIdentifier = new ProxyIdentifier(true, 'customLoader');
+      }
+      return registeredProxyIdentifier;
+    }
+    return getOrRegister;
+  })();
+
+  function installRpc(rpcProtocol) {
+    //TODO register disposable to handle extension host exit
+    // _rpcProtocol._register({dispose: ()=>{}});
+
+    rpcProtocol.set(getOrRegisterProxyIdentifier(), rendererRpcHandler);
+    const rpcHandlerProxy = rpcProtocol.getProxy(getOrRegisterProxyIdentifier());
+    rendererRpcHandler.setProxy(rpcHandlerProxy);
+    resolveRpcHandler(rendererRpcHandler);
+    let initTimerHandle=null;
+    const loaderChannel = {
+      recv: function(args) {
+        if (args[1] == 'initreply') {
+          if (initTimerHandle) {
+            clearTimeout(initTimerHandle);
+            initTimerHandle = null;
+          }
+          console.log('received init');
+        }
+      }
+    };
+
+    /* Init mechanism so the custom-loader extension inside the extension host
+     * can detect if bootstrap-window.js was patched and hook.js has been loaded */
+    rendererRpcHandler.registerChannelHandler('customloader', loaderChannel);
+    let numPings = 1;
+    const pingInit = () =>{
+      loaderChannel.send('init');
+      if (numPings++ > 10 && initTimerHandle) {
+        clearTimeout(initTimerHandle);
+        initTimerHandle = null;
+      }
+    }
+    initTimerHandle = setInterval(pingInit, 2000);
+    pingInit();
   }
+
   // END renderer <-> extension host RPC
 
 
