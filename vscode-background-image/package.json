@@ -29,14 +29,62 @@
   "contributes": {
     "commands": [
       {
-        "command": "vscode-background-image.register",
-        "title": "Enable background image",
-				"category": "Background-Image"
+        "command": "backgroundimage.cmd.register",
+        "title": "Enable background image extension",
+        "category": "Background-Image"
       },
       {
-        "command": "vscode-background-image.unregister",
-        "title": "Disable background image",
-				"category": "Background-Image"
+        "command": "backgroundimage.cmd.unregister",
+        "title": "Disable background image extension",
+        "category": "Background-Image"
+      },
+      {
+        "command": "backgroundimage.cmd.prev",
+        "title": "Previous background image",
+        "category": "Background-Image"
+      },
+      {
+        "command": "backgroundimage.cmd.next",
+        "title": "Next background image",
+        "category": "Background-Image"
+      },
+      {
+        "command": "backgroundimage.cmd.toggle",
+        "title": "Toggle background image",
+        "category": "Background-Image"
+      },
+      {
+        "command": "backgroundimage.cmd.pickimage",
+        "title": "Pick background image",
+        "category": "Background-Image"
+      },
+      {
+        "command": "backgroundimage.cmd.setfolder",
+        "title": "Set background image folder",
+        "category": "Background-Image"
+      }
+    ],
+    "configuration": [
+      {
+        "id": "backgroundimage",
+        "title": "Background Image",
+        "properties": {
+          "backgroundimage.enabled": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enabled/Disable background image",
+            "scope": "window"
+          },
+          "backgroundimage.folder": {
+            "type": "string",
+            "markdownDescription": "Use the quick pick command to pick any image from the image folder"
+          },
+          "backgroundimage.image": {
+            "type": "string",
+            "title": "Background Image",
+            "markdownDescription": "background image URI"
+          }
+        }
       }
     ]
   },

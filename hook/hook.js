@@ -27,8 +27,7 @@ function _overrideArgs(where, name, cb) {
   };
 }
 
-const DEBUG_EVT_HANDLERS = false;
-const KEEP_RUNTIME_HOOKS = true;
+const KEEP_RUNTIME_HOOKS = false;
 const PRINT_LOG_INSTANCES = false;
 
 const PROC_MAIN = 1;
@@ -74,9 +73,7 @@ class VSCodeHook extends Log {
     this.nameByCtor = new Map();
     this.nameByDesc = new Map();
     this.registrySvcDesc = null;
-    if (DEBUG_EVT_HANDLERS) {
-      this.evts.on('instance', ()=>this._installDebugEvtHandlers());
-    }
+
     if (PRINT_LOG_INSTANCES) {
       this.evts.on('instance', (typeName,_)=>console.warn(typeName));
     }
@@ -207,14 +204,14 @@ class VSCodeHook extends Log {
 
   installBootHooks() {
     this.hooksInstalled = true;
-    if (!DEBUG_EVT_HANDLERS) {
-      const timeout = 8000;
-      setTimeout(()=> {
-        if (this.numRequires > 0) {
-          console.error(`${this.numRequires} require where not fullfilled after ${timeout}ms`, this.requires);
-        }
-      }, timeout, this);
-    }
+
+    const timeout = 8000;
+    setTimeout(()=> {
+      if (this.numRequires > 0) {
+        console.error(`${this.numRequires} require where not fullfilled after ${timeout}ms`, this.requires);
+      }
+    }, timeout, this);
+
     let moduleList = [
       'vs/platform/instantiation/common/serviceCollection',
       'vs/platform/instantiation/common/instantiationService'
@@ -272,39 +269,6 @@ class VSCodeHook extends Log {
     this.hookDisposeList.forEach(f => f());
   }
 
-  _installDebugEvtHandlers() {
-    // testing callbacks (debug only, they are never disposed!!)
-    const _this = this;
-
-    const lifecycleService = this.byName.get('LifecycleMainService');
-    const codeWindow = this.byName.get('CodeWindow');
-    const configService = this.byName.get('ConfigurationService');
-    const workspaceService = this.byName.get('WorkspacesManagementMainService');
-
-    if (codeWindow && !this.cwReadyHandlerInstalled) {
-      this.cwReadyHandlerInstalled = true;
-      codeWindow.onDidSignalReady(_ => _this.warn('codeWindow.onDidSignalReady'));
-      codeWindow.onWillLoad(_ => _this.warn('codeWindow.onWillLoad'));
-    }
-
-    if (lifecycleService && !this.lcmsHandlerInstalled) {
-      this.lcmsHandlerInstalled = true;
-
-      lifecycleService.when(1).then(_ => _this.warn('lifecycleService.when(1)'));
-      lifecycleService.when(2).then(_ => _this.warn('lifecycleService.when(2)'));
-      lifecycleService.when(3).then(_ => _this.warn('lifecycleService.when(3)'));
-      lifecycleService.onWillLoadWindow(_ => _this.warn('lifecycleService.onWillLoadWindow'));
-    }
-
-    if (configService && !this.cfgChangedHandlerInstalled) {
-      this.cfgChangedHandlerInstalled = configService.onDidChangeConfiguration(_ => _this.warn('onDidChangeConfiguration'));
-      configService.userConfiguration?.onDidChange(_ => _this.warn('userConfiguration.onDidChange'));
-    }
-
-    if (workspaceService && !this.wsEnterHandlerInstalled) {
-      this.wsEnterHandlerInstalled = workspaceService.onDidEnterWorkspace(_ => _this.warn('onDidEnterWorkspace'));
-    }
-  }
 }
 
 
@@ -366,16 +330,6 @@ function loadCustomModules(log, vsAmdLoader, cfgModuleList, contribBaseUri) {
     }, undefined);
 }
 
-function loadUserConfigModules(log, vsAmdLoader, configService) {
-  log.warn('loadUserConfigModules');
-  const cfgModuleList = configService.getValue('vscodecustomloader.modulelist');
-  if (!cfgModuleList || !Array.isArray(cfgModuleList) || cfgModuleList.length < 1) {
-    log.warn(`Empty configuration. Please configure 'vscodecustomloader.modulelist'`);
-    return;
-  }
-  loadCustomModules(log, vsAmdLoader, cfgModuleList);
-}
-
 async function loadContribRegistryModules(log, vsAmdLoader, contribRegistry, extensionService) {
   for (const contrib of contribRegistry) {
     try {
@@ -409,15 +363,16 @@ exports.bootstrapWindow = () => {
   const bootstrapLoadFunc = globalObj.MonacoBootstrapWindow.load;
   const vscHook = new VSCodeHook(processType, globalObj.require, globalObj);
 
-  if (processType == PROC_RENDER) {
+  let resolveRpcHandler;
+  /* 
+   * global CustomLoaderRPC allows renderer code to install a RPC handler
+   * for commmunication with the extension in extension host process.
+   * maybe this should be a module that needs to be imported.
+   * But this works for now 
+   */
+  globalObj.CustomLoaderRPC = new Promise(resolve=>resolveRpcHandler = resolve);
 
-    /* Load module list from user settings (json) */
-    false&&vscHook.require(['LifecycleService', 'ConfigurationService']).then((services) => {
-        const [lifecycleService, configService] = services;
-        lifecycleService.when(4).then(_ => {
-          loadUserConfigModules(vscHook, vscHook.vsAmdLoader, configService);
-        });
-      });
+  if (processType == PROC_RENDER) {
 
     /* Load contributions from global storage and load their registered modules */
     vscHook.require(['StorageService', 'ExtensionService'])
@@ -450,19 +405,6 @@ exports.bootstrapWindow = () => {
         });
       });
 
-    // BEGIN renderer <-> main process IPC
-
-    /* Install IPC channel for communication: renderer <-> main */
-    /* This is more of a test, I don't use this right now */
-    vscHook.require(['MainProcessService']).then((services) => {
-        const [mainProcessService] = services;
-        mainProcessService.getChannel('customLoader').call('init', ['hi friend']);
-        const onTestEvent = mainProcessService.getChannel('customLoader').listen('testevent', ['hi friend']);
-        onTestEvent((...args)=>vscHook.log('testevent occured', args));
-      });
-
-    // END renderer <-> main process IPC
-
 
     // BEGIN renderer <-> extension host RPC
 
@@ -471,18 +413,40 @@ exports.bootstrapWindow = () => {
      * Will be registered to ID created by getOrRegisterProxyIdentifier
      * Interface must be identical for registered proxy identifier IDs
      */
-    const extHostRpcHandler = new class {
+    const rendererRpcHandler = new class RPCChannelHandler_Renderer {
       constructor() {
-        this.log = new Log(getCurrentProcName(processType), 'ExtHostRpcHandler');
+        this.log = new Log(getCurrentProcName(processType), 'RPCChannelHandler');
+        this.channels = {};
       }
-      $handleMessage(args) {
-        this.log.warn('$handleMessage', args);
-        return Promise.resolve("hi from renderer");
+      setProxy(rpcHandlerProxy) {
+        this.rpcHandlerProxy = rpcHandlerProxy;
+      }
+      registerChannelHandler(srcExtId, handler) {
+        handler['send'] = (...args) => this.send([srcExtId, ...args]);
+        this.channels[srcExtId] = handler;
+      }
+      uregisterChannels(srcExtId) {
+        this.channels[srcExtId] = undefined;
+      }
+      /* Incoming */
+      $recv(args) {
+        if (args.length) {
+          const chan = this.channels[args[0]];
+          if (chan) {
+            return chan.recv(args);
+          }
+        }
+        this.log.warn('$recv', 'Message has not been handled', args);
+        return "Message has not been handled";
+      }
+      /* Outgoing */
+      send(args) {
+        return this.rpcHandlerProxy.$recv(args);
       }
     };
 
     /**
-     * may not be called before extension host was created.
+     * must not be called before extension host was created.
      * returns same identifier on subsequent calls
      */
     const getOrRegisterProxyIdentifier = (() => {
@@ -501,22 +465,15 @@ exports.bootstrapWindow = () => {
       //TODO register disposable to handle extension host exit
       // _rpcProtocol._register({dispose: ()=>{}});
 
-      rpcProtocol.set(getOrRegisterProxyIdentifier(), extHostRpcHandler);
+      rpcProtocol.set(getOrRegisterProxyIdentifier(), rendererRpcHandler);
       const rpcHandlerProxy = rpcProtocol.getProxy(getOrRegisterProxyIdentifier());
-      rpcHandlerProxy.$handleMessage(['Init message from renderer', Math.random()]);
-      let timer = setInterval(()=>{
-        try {
-          rpcHandlerProxy.$handleMessage(['test from renderer', Math.random()]);
-        } catch (error) {
-          vscHook.logErr(error);
-          clearTimeout(timer);
-        }
-      }, 60000);
+      rendererRpcHandler.setProxy(rpcHandlerProxy);
+      // rendererRpcHandler.send(['Init message from renderer', Math.random()]);
+      resolveRpcHandler(rendererRpcHandler);
     }
 
 
     /* Install rpc handler for communication: renderer <-> extension host */
-    /* This is more of a test, I don't use this right now */
     vscHook.require(['ExtensionService']).then((services) => {
         const [extensionService] = services;
         let subscr = null;
@@ -577,108 +534,21 @@ exports.bootstrapWindow = () => {
     return bootstrapLoadFunc(modulePaths, resultCallback, options);
   };
 };
-
-
-function updateValidFileRoots(vsAmdLoader, configService, potocolMainService) {
-  const cfgModuleList = configService.getValue('vscodecustomloader.modulelist');
-  if (!cfgModuleList || !Array.isArray(cfgModuleList) || cfgModuleList.length < 1) {
-    this.warn(`Empty configuration. Please configure 'vscodecustomloader.modulelist'`);
-    return;
-  }
-
-  const vs_uri = vsAmdLoader('vs/base/common/uri'); // synchronous require
-
-  // file roots never get removed when removed from configuration
-  // protocolmainservice can handle duplicates
-  for (const directoryCfg of cfgModuleList) {
-    potocolMainService.addValidFileRoot(URI.file(directoryCfg.path));
-  }
-}
-
-
-exports.bootstrapMain = (globalObj, vsAmdLoader, bootstrapLoadFunc, loaderArgs) => {
+/* Main process is not required, unless we have to addValidFileRoots */
+/* exports.bootstrapMain = (globalObj, vsAmdLoader, bootstrapLoadFunc, loaderArgs) => {
   const entrypoint = loaderArgs[0];
   const onLoadFn = loaderArgs[1];
   const onErrorFn = loaderArgs[2];
   const vscHook = new VSCodeHook(PROC_MAIN, vsAmdLoader, globalObj);
 
-  // BEGIN main <-> renderer process IPC
-  const createIpcTestChannel = () => new class {
-    constructor() {
-      const vsEvent = vscHook.vsAmdLoader('vs/base/common/event');
-      this._evtTestEmitter = new vsEvent.Emitter();
-      this.onTestEvent = this._evtTestEmitter.event;
-      this.log = new Log(getCurrentProcName(PROC_MAIN), 'IPCChannel');
-
-      this.evts = new events.EventEmitter();
-      setInterval(()=>this._evtTestEmitter.fire({reason:'test',someData: Math.random()}), 60000);
-    }
-    // call<T>(ctx: TContext, command: string, arg?: any, cancellationToken?: CancellationToken): Promise<T>;
-    // listen<T>(ctx: TContext, event: string, arg?: any): Event<T>;
-    call(ctx, command, arg, cancellationToken) {
-      this.log.warn('call', ctx, command, arg);
-      switch (command) {
-          case 'init': return Promise.resolve("welcome back");
-      }
-      throw new Error(`Call not found: ${command}`);
-    }
-    listen(ctx, event, arg) {
-      this.log.warn('listen', ctx, event, arg);
-      switch (event) {
-          case 'testevent': return this.onTestEvent;
-      }
-      throw new Error(`Event not found: ${event}`);
-    }
-  };
-
-  function registerIpcChannel() {
-      try {
-        const channelName = 'customLoader';
-        vscHook.warn(`register IPC channel ${channelName}`);
-        const vsApp = vscHook.vsAmdLoader('vs/code/electron-main/app');
-        let hookDispose = undefined;
-        hookDispose = _overrideArgs(vsApp.CodeApplication, 'initChannels', function (prevFuncArgsApplied, prevArgs) {
-          hookDispose();
-          const retVal = prevFuncArgsApplied();
-          const mainProcesslectronIPCServer = prevArgs[1];
-          mainProcesslectronIPCServer.registerChannel(channelName, createIpcTestChannel());
-          return retVal;
-        });
-      } catch (error) {
-        vscHook.logErr(error);
-      }
-  }
-
-  // END renderer <-> main process IPC
-
-  /* Add valid fileroots for all modules listed in user settings (json) */
-  false&&vscHook.require(['LifecycleMainService', 'ConfigurationService', 'ProtocolMainService'])
-    .then((services) => {
-      const [lifecycleService, configService, potocolMainService] = services;
-      vscHook.logErr('############################################');
-      vscHook.logErr('###      ProtocolMainService found       ###');
-      vscHook.logErr('###          Adding File Roots           ###');
-      vscHook.logErr('############################################');
-
-      lifecycleService.when(2).then(() => {
-        updateValidFileRoots(vsAmdLoader, configService, potocolMainService);
-        configService.onDidChangeConfiguration((e) => {
-          if (e.affectsConfiguration('vscodecustomloader')) {
-            vscHook.logErr('vscodecustomloader configuration changed')
-            updateValidFileRoots(vsAmdLoader, configService, potocolMainService);
-          }
-        });
-      });
-    });
-
   // trigger bootstrapping
   let r = bootstrapLoadFunc(entrypoint, function (...args) {
-    registerIpcChannel();
+    // registerIpcChannel();
     vscHook.installBootHooks();
     if (onLoadFn)
       return onLoadFn(...args);
     return undefined;
   }, onErrorFn);
   return r;
-};
+}; */
 

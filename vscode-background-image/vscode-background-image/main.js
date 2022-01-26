@@ -1,206 +1,128 @@
 define([
+  "module",
   "require",
   "exports",
-  "vscode-background-image/cssutil",
-  "vscode-background-image/background-image"
-], function (require, exports, cssutil, bgImage) {
+  "fs",
+  "vs/base/common/uri",
+  "vs/base/common/network"
+], function (module, require, exports, fs, uri, network) {
   "use strict";
-  const CSSUtil = cssutil.CSSUtil;
-  const CustomBackground = bgImage.CustomBackground;
+  const moduleCfg = module.config();
 
-  const myassert = function (x) {
-    if (!x) console.error("ASSERTION FAILED");
-  }
-
-  //TODO: move this out of here
-  const bgImgFiles = {
-    filelist: [
-      "wallhaven-01wvgv.jpg",
-      "wallhaven-397mgd.png",
-      "wallhaven-3z91ey.jpg",
-      "wallhaven-42vwx0.jpg",
-      "wallhaven-45w1e1.jpg",
-      "wallhaven-47l3y0.jpg",
-      "wallhaven-4lqz6r.jpg",
-      "wallhaven-4x8l1d.jpg",
-      "wallhaven-5wkj59.jpg",
-      "wallhaven-j3lvlq.png",
-      "wallhaven-j5vejp.png",
-      "wallhaven-lmj5gl.png",
-      "wallhaven-lmwegp.png",
-      "wallhaven-mdyd1k.png",
-      "wallhaven-n6rv2w.png",
-      "wallhaven-nk888q.jpg",
-      "wallhaven-nkg696.jpg",
-      "wallhaven-nm188n.png",
-      "wallhaven-nm2729.png",
-      "wallhaven-nr27eq.jpg",
-      "wallhaven-nzrokv.jpg",
-      "wallhaven-r45574.jpg",
-      "wallhaven-r7981q.jpg",
-      "wallhaven-y8kdvd.jpg",
-      "xp-night-hill-4k-p1-3840x2160.jpg"
-    ],
-    imgDirectory: "C:\\dev\\vscode-customize\\wallpapers_blurry\\",
-  };
-
-  let imageIdx = 0;
-
-  function SetImageIdx(idx) {
-
-    if (!bgImgFiles.filelist || !bgImgFiles.filelist.length)
-      return;
-    idx = idx < 0 ? bgImgFiles.filelist.length - 1 : idx;
-    imageIdx = idx >= bgImgFiles.filelist.length ? 0 : idx;
-    let imagePath = null;
-    imagePath = bgImgFiles.filelist[imageIdx];
-    if (bgImgFiles.imgDirectory) {
-      imagePath = bgImgFiles.imgDirectory + imagePath;
-    }
-    if (imagePath) {
-
-      CustomBackground.setImage(imagePath);
-    }
-  }
-  function setImageAndUpdateConfiguration() {
-      CustomBackground.setImage(imagePath);
-    ACCESS.byName.get("ConfigurationService").getValue("conf.view.showOnWindowOpen")
-  }
-
-  function setRandomImage() {
-    !bgImgFiles.filelist || !bgImgFiles.filelist.length || SetImageIdx(Math.floor(Math.random() * bgImgFiles.filelist.length));
-  }
-
-  const CustomStyle = (() => {
-    let isEnabled = true;
-    let isInitialized = false;
-    let handlersOnActivate = [];
-    let registeredCssFiles = [];
+  const { URI } = uri;
+  const { FileAccess } = network;
 
 
-    function createButton(btnId, btnLabel, btnSymbol, fnOnClick) {
-      const e = document.createElement("div");
-      e.id = btnId;
-      e.className = "statusbar-item right";
-      e.setAttribute("aria-label", btnLabel);
-      const a = document.createElement("a");
-      a.tabIndex = -1;
-      a.setAttribute("role", "button");
-      a.setAttribute("aria-label", btnLabel);
-      const span = document.createElement("span");
-      span.className = "codicon " + btnSymbol;
-      a.appendChild(span);
-      a.addEventListener('click', fnOnClick);
-
-      // e.addEventListener('mouseover', otherEvt);
-
-      e.appendChild(a);
-      return e;
-    }
-
-    function createStatusBarControls() {
-      const elButtonFirst = document.querySelector(".right-items #status\\.vsccustomize\\.toggle");
-      if (!elButtonFirst) {
-        const elStatusBar = document.querySelector(".right-items");
-        const elStatusBarItem = document.querySelector(".right-items > :first-child");
-        if (!elStatusBar || !elStatusBarItem) {
-          setTimeout(createStatusBarControls, 500);
-          return;
+  const Helpers = {
+    findStyleSheet: (filename, cb) => {
+      var docSheets = document.styleSheets;
+      for (var i in docSheets) {
+        if (docSheets[i].href && docSheets[i].href.endsWith(filename)) {
+          cb(docSheets[i]);
         }
-
-        let btnStatusBar = createButton(
-          "status.vsccustomize.next",
-          "Next Background",
-          "codicon-triangle-right",
-          function () {
-            SetImageIdx(imageIdx + 1);
-          });
-        elStatusBar.appendChild(btnStatusBar);
-        btnStatusBar = createButton(
-          "status.vsccustomize.toggle",
-          "Background Image On/Off",
-          "codicon-symbol-color",
-          function () {
-            CustomStyle.toggleEnabled();
-          });
-        elStatusBar.appendChild(btnStatusBar);
-        btnStatusBar = createButton(
-          "status.vsccustomize.prev",
-          "Previous Background",
-          "codicon-triangle-left",
-          function () {
-            SetImageIdx(imageIdx - 1);
-          });
-        elStatusBar.appendChild(btnStatusBar);
       }
-      setTimeout(createStatusBarControls, 6000);
-    }
-
-    function setStylesheetsAttrEnabled(bEnabled) {
+    },
+    toBase64: (arr) => {
+      //arr = new Uint8Array(arr) if it's an ArrayBuffer
+      return btoa(
+        arr.reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+    },
+    setStylesheetsAttrEnabled: (cssFiles, bEnabled) => {
       /**
        * TODO
        * swap this around. iterate over the DOM link elements
        * and for each check if the name is in registeredCssFiles
        */
-      registeredCssFiles.forEach(function (ssFilename) {
-        CSSUtil.findStyleSheet(ssFilename, function (domLinkEl) {
+      cssFiles.forEach(function (ssFilename) {
+        Helpers.findStyleSheet(ssFilename, function (domLinkEl) {
           domLinkEl.disabled = !bEnabled;
         });
       });
     }
-    return {
-      initialized: () => isInitialized,
-      enabled: () => isEnabled,
-      toggleEnabled: () => {
-        isEnabled = !isEnabled;
-        setStylesheetsAttrEnabled(isEnabled);
+  };
+
+
+const BackgroundImage = (_ => {
+    const requiredCssFiles = [
+      "ws-background-image.css",
+      "ws-transparent-parts.css"
+    ];
+
+    let isEnabled = true;
+    const customBgConfig = {
+      currentImage: {
+        fp: null,
+        url: null
       },
-      subscribeOnActivate: (fn) => {
-        handlersOnActivate.push(fn);
-      },
-      init: () => {
-        registeredCssFiles.push(...CustomBackground.getRequiredCssFiles());
-        CSSUtil.loadCssFiles(
-          registeredCssFiles,
-          function () {
-            setTimeout(createStatusBarControls, 500);
-            isInitialized = true;
-            myassert(CustomStyle.initialized());
-            if (isInitialized && isEnabled) {
-              myassert(CustomStyle.enabled());
-              while (handlersOnActivate.length) {
-                handlersOnActivate.shift().call();
-              }
-            }
-            if (isInitialized && !isEnabled) {
-              myassert(!CustomStyle.enabled());
-              setStylesheetsAttrEnabled(isEnabled);
-            }
-          },
-          function (error) {
-            console.error(error);
-            isInitialized = false;
-            myassert(!CustomStyle.initialized());
+      loadWithReadFile: false,
+      backgroundImageCssRule: "no-repeat center center fixed; background-size: cover;"
+    };
+    return new class {
+      constructor() {
+        if (!isEnabled) {
+          Helpers.setStylesheetsAttrEnabled(isEnabled);
+        }
+      }
+
+      get enabled() { return isEnabled }
+      set enabled(val) {
+        isEnabled = val;
+        Helpers.setStylesheetsAttrEnabled(requiredCssFiles, isEnabled);
+      }
+      setImage(imgFilePath) {
+        console.warn('setImage', imgFilePath);
+        customBgConfig.currentImage.fp = imgFilePath;
+        const fileUri = FileAccess.asBrowserUri(URI.file(imgFilePath));
+        customBgConfig.currentImage.url = fileUri;
+
+        var newStyle = "";
+        if (customBgConfig.loadWithReadFile) {
+
+          console.log("readFileSync", imgFilePath);
+
+          const buf = fs.readFileSync(imgFilePath);
+          const base64Img = Helpers.toBase64(buf);
+
+          var fileType = "jpg";
+          if (imgFilePath.endsWith(".png")) {
+            fileType = "png";
           }
-        );
+          newStyle = "background: url(data:image/" + fileType + ";base64," + base64Img + ") " + customBgConfig.backgroundImageCssRule;
+        } else {
+          newStyle = "background: url(" + fileUri.toString(false) + ") " + customBgConfig.backgroundImageCssRule;
+        }
+
+        Helpers.findStyleSheet("ws-background-image.css", function (styleSheet) {
+          styleSheet.deleteRule(2);
+          var rule = ".monaco-workbench { " + newStyle + "; }";
+          styleSheet.insertRule(rule, 2)
+        });
       }
     };
   })();
 
-  CustomStyle.subscribeOnActivate(function () {
-    myassert(CustomStyle.initialized());
-    let cfgImage = global.ACCESS?.byName?.get("ConfigurationService")?.getValue("vscode-customize.background.image")
-    if (typeof(cfgImage) == 'string') {
-      CustomBackground.setImage(cfgImage);
-    } else {
-      setTimeout(setRandomImage, 300);
+
+  const rpcChannel = {
+    recv(args) {
+      args = args.splice(1);
+      const command = args.splice(0, 2).join('.');
+      switch (command) {
+        case 'background.enable':
+          BackgroundImage.enabled = args[0];
+          break;
+        case 'background.set':
+          BackgroundImage.setImage(args[0]);
+          break;
+      }
     }
+    /* send(args) will be added by API */
+  };
+
+
+  global.CustomLoaderRPC.then((rpcChannelHandler)=> {
+    rpcChannelHandler.registerChannelHandler('nidefawl.vscode-background-image', rpcChannel);
   });
 
-
-  //TODO: subscribe to the right event to call this after
-  CustomStyle.init();
-
-  exports.CustomStyle = CustomStyle;
-
+  exports.BackgroundImage = BackgroundImage;
 });

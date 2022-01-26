@@ -27,14 +27,37 @@ function _override(where, name, cb) {
  * Will be registered to ID created by getOrRegisterProxyIdentifier
  * Interface must be identical for registered proxy identifier IDs
  */
- const extHostIpcHandler = new class {
+class RPCChannelHandler_ExtHost {
   constructor() {
+    this.channels = {};
   }
-  $handleMessage(args) {
-    console.warn('$handleMessage', args);
-    return Promise.resolve("hi from extension");
+  setProxy(rpcHandlerProxy) {
+    this.rpcHandlerProxy = rpcHandlerProxy;
   }
-};
+  registerChannelHandler(srcExtId, handler) {
+    handler['send'] = (...args) => this.send([srcExtId, ...args]);
+    this.channels[srcExtId] = handler;
+  }
+  uregisterChannels(srcExtId) {
+    this.channels[srcExtId] = undefined;
+  }
+  /* Incoming */
+  $recv(args) {
+    if (args.length) {
+      const chan = this.channels[args[0]];
+      if (chan) {
+        return chan.recv(args);
+      }
+    }
+    logChannel?.appendLine("RPC Message has not been handled")
+    console.warn('$recv', 'Message has not been handled', args);
+    return "Message has not been handled";
+  }
+  /* Outgoing */
+  send(args) {
+    return this.rpcHandlerProxy.$recv(args);
+  }
+}
 
 /**
  * may not be called before extension host was created.
@@ -52,21 +75,6 @@ const getOrRegisterProxyIdentifier = (() => {
   return getOrRegister;
 })();
 
-function installRpc(rpcProtocol, ext) {
-  //TODO register disposable to handle extension host exit
-  // rpcProtocol._register({dispose: ()=>{}});
-  rpcProtocol.set(getOrRegisterProxyIdentifier(), extHostIpcHandler);
-  const ipcHandlerProxy = rpcProtocol.getProxy(getOrRegisterProxyIdentifier());
-  let timer = setInterval(()=>{
-    try {
-      ipcHandlerProxy.$handleMessage(['test from extension', Math.random()]);
-    } catch (error) {
-      console.error(error);
-      clearTimeout(timer);
-    }
-  }, 10000);
-}
-
 
 var logChannel = null;
 /**
@@ -82,42 +90,58 @@ class VsCodeCustomizeExtension {
    * @param {vscode.ExtensionContext} context
    */
   constructor(context) {
-    this.ctxt = context;
-
     logChannel = vscode.window.createOutputChannel('CustomLoader');
-    vscode.workspace.onDidChangeConfiguration(evt => {
+    this.ctxt = context;
+    const ext = this;
+    this.rpcPromise = new Promise((resolve, reject) => {
+      let disposeOverride = undefined;
+      disposeOverride = _override(RPCProtocol, '_receiveRequest', function _hookRpcRecvReq(prevFunc) {
+        try {
+          disposeOverride();
+          ext._createRpcChannelHandler(this);
+          resolve(this);
+        } catch (error) {
+          reject(error);
+        }
+        return prevFunc();
+      });
+    }).catch((error) => {
+      console.error('RPC Hook failed', error);
+      logChannel?.appendLine('RPC Hook failed');
+    });
+
+/*     vscode.workspace.onDidChangeConfiguration(evt => {
       if (evt.affectsConfiguration('vscodecustomloader')) {
         console.log('configuration changed');
       }
-    }, this, this.ctxt.subscriptions);
-    let cmdReset = vscode.commands.registerCommand('vscode-custom-loader.reset', this.resetRegistry, this);
+    }, this, this.ctxt.subscriptions); */
+
+    let cmdReset = vscode.commands.registerCommand('vscode-custom-loader.reset', this._resetRegistry, this);
     this.ctxt.subscriptions.push(logChannel);
     this.ctxt.subscriptions.push(cmdReset);
 
-    extensionLog(this.ctxt.extension.packageJSON.displayName);
-    extensionLog(`${this.ctxt.extension.id} installed at ${this.ctxt.asAbsolutePath('vscode-extension.js')}`);
+    // extensionLog(`${this.ctxt.extension.id} installed at ${this.ctxt.asAbsolutePath('vscode-extension.js')}`);
+  }
+  _createRpcChannelHandler(rpcProtocol) {
+      //TODO register disposable to handle extension host exit
+      // rpcProtocol._register({dispose: ()=>{}});
+      this.rpcChannelHandler = new RPCChannelHandler_ExtHost(rpcProtocol);
+      // don't swap next 2 calls!
+      rpcProtocol.set(getOrRegisterProxyIdentifier(), this.rpcChannelHandler);
+      const rpcHandlerProxy = rpcProtocol.getProxy(getOrRegisterProxyIdentifier());
+      this.rpcChannelHandler.setProxy(rpcHandlerProxy);
   }
 
-  installRpc() {
-    let ext = this;
-    let disposeOverride = undefined;
-    disposeOverride = _override(RPCProtocol, '_receiveRequest', function _hookRpcRecvReq(prevFunc) {
-      try {
-        disposeOverride();
-        console.log('_receiveRequest hook');
-        installRpc(this, ext);
-      } catch (error) {
-        console.log(error);
-      }
-      return prevFunc();
-    });
-  }
 
-  resetRegistry() {
+  _resetRegistry() {
 
     extensionLog(this.ctxt.extension);
     this.ctxt.globalState.update(__CONTRIB_REG_NAME, []);
     vscode.window.showInformationMessage(`Reset registry`);
+  }
+  async registerRpcHandler(srcExtId, handler) {
+    await this.rpcPromise;
+    return this.rpcChannelHandler.registerChannelHandler(srcExtId, handler);
   }
 
   registerContribution(srcExtId, moduleList) {
@@ -130,7 +154,6 @@ class VsCodeCustomizeExtension {
       extReg = {id: srcExtId, enabled: true, errors: undefined, modules: moduleList}
       apiReg.push(extReg);
     }
-
     this.ctxt.globalState.update(__CONTRIB_REG_NAME, apiReg);
   }
   unregisterContributions(srcExtId) {
@@ -146,10 +169,10 @@ class VsCodeCustomizeExtension {
  */
 async function activate(context) {
   const ext = new VsCodeCustomizeExtension(context);
-  ext.installRpc();
   const api = {
     registerContribution: ext.registerContribution.bind(ext),
-    unregisterContributions: ext.unregisterContributions.bind(ext)
+    unregisterContributions: ext.unregisterContributions.bind(ext),
+    registerRpcHandler: ext.registerRpcHandler.bind(ext)
   };
   return api;
 }
