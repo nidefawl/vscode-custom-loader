@@ -353,7 +353,6 @@ exports.bootstrapWindow = () => {
   if (!globalObj.MonacoBootstrapWindow?.load) return;
   if (!globalObj['require']) return;
   const processType = {
-    'sharedProcess.html': PROC_SHARED,
     'workbench.html': PROC_RENDER,
   }[globalObj?.window?.location?.href.toString().split('/').pop()];
 
@@ -534,21 +533,3 @@ exports.bootstrapWindow = () => {
     return bootstrapLoadFunc(modulePaths, resultCallback, options);
   };
 };
-/* Main process is not required, unless we have to addValidFileRoots */
-/* exports.bootstrapMain = (globalObj, vsAmdLoader, bootstrapLoadFunc, loaderArgs) => {
-  const entrypoint = loaderArgs[0];
-  const onLoadFn = loaderArgs[1];
-  const onErrorFn = loaderArgs[2];
-  const vscHook = new VSCodeHook(PROC_MAIN, vsAmdLoader, globalObj);
-
-  // trigger bootstrapping
-  let r = bootstrapLoadFunc(entrypoint, function (...args) {
-    // registerIpcChannel();
-    vscHook.installBootHooks();
-    if (onLoadFn)
-      return onLoadFn(...args);
-    return undefined;
-  }, onErrorFn);
-  return r;
-}; */
-
