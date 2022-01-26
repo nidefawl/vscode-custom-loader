@@ -50,6 +50,7 @@ const BackgroundImage = (_ => {
     ];
 
     let isEnabled = true;
+    let stylesheetsEnabled = false;
     const customBgConfig = {
       currentImage: {
         fp: null,
@@ -60,17 +61,22 @@ const BackgroundImage = (_ => {
     };
     return new class {
       constructor() {
-        if (!isEnabled) {
-          Helpers.setStylesheetsAttrEnabled(isEnabled);
-        }
+        Helpers.setStylesheetsAttrEnabled(requiredCssFiles, stylesheetsEnabled);
       }
 
       get enabled() { return isEnabled }
       set enabled(val) {
         isEnabled = val;
-        Helpers.setStylesheetsAttrEnabled(requiredCssFiles, isEnabled);
+        if (stylesheetsEnabled !== isEnabled) {
+          stylesheetsEnabled = isEnabled;
+          Helpers.setStylesheetsAttrEnabled(requiredCssFiles, stylesheetsEnabled);
+        }
       }
       setImage(imgFilePath) {
+        if (stylesheetsEnabled !== isEnabled) {
+          stylesheetsEnabled = isEnabled;
+          Helpers.setStylesheetsAttrEnabled(requiredCssFiles, stylesheetsEnabled);
+        }
         console.warn('setImage', imgFilePath);
         customBgConfig.currentImage.fp = imgFilePath;
         const fileUri = FileAccess.asBrowserUri(URI.file(imgFilePath));

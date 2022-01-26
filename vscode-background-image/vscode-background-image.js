@@ -196,12 +196,10 @@ async function activate(context) {
 
   lazyGetRPCChannel().then(rpc=>{
     const wsConfig = workspace.getConfiguration();
-    const enabled = wsConfig.get('backgroundimage.enabled', true);
     const backgroundImageCurrent = wsConfig.get('backgroundimage.image', null);
     if (typeof (backgroundImageCurrent) === 'string' && backgroundImageCurrent.length) {
       rpc.send('background', 'set', backgroundImageCurrent);
     }
-    rpc.send('background', 'enable', enabled);
   });
 }
 
