@@ -26,8 +26,9 @@
   "contributes": {
     "commands": [
       {
-        "command": "vscode-custom-loader.helloWorld",
-        "title": "vscode-custom-loader test command"
+        "command": "vscode-custom-loader.reset",
+        "title": "Remove all contributions",
+        "category": "VSCode Custom Loader"
       }
     ],
     "configuration": [
@@ -91,8 +92,5 @@
         }
       }
     ]
-  },
-  "devDependencies": {
-    "vsce": "^2.6.3"
   }
 }

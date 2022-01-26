@@ -1,0 +1,46 @@
+{
+  "name": "vscode-background-image",
+  "displayName": "VSCode background image",
+  "description": "Add wallpaper background images to VSCode",
+  "author": "nidefawl",
+  "publisher": "nidefawl",
+  "license": "MIT",
+  "version": "0.0.3",
+  "private": true,
+  "repository-todo": {
+    "type": "git",
+    "url": "https://github.com/nidefawl/xxxx"
+  },
+  "homepage-todo": "https://github.com/nidefawl/xxxx",
+  "main": "vscode-background-image.js",
+  "engines": {
+    "vscode": "^1.63.0"
+  },
+  "keywords": [
+    "wallpaper", "background", "background image"
+  ],
+  "categories": [
+    "Other",
+    "UI"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscode-background-image.register",
+        "title": "Enable background image",
+				"category": "Background-Image"
+      },
+      {
+        "command": "vscode-background-image.unregister",
+        "title": "Disable background image",
+				"category": "Background-Image"
+      }
+    ]
+  },
+  "extensionDependencies": [
+    "nidefawl.vscode-custom-loader"
+  ]
+}

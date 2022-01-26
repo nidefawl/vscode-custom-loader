@@ -1,0 +1,42 @@
+
+#workbench\.parts\.sidebar {
+  background-color: #05050544 !important;
+}
+#workbench\.parts\.sidebar .title {
+  background-color: #05050522 !important;
+}
+
+#workbench\.parts\.auxiliarybar {
+  background-color: #05050544 !important;
+}
+#workbench\.parts\.auxiliarybar .title {
+  background-color: #05050522 !important;
+}
+
+.split-view-view > .part .monaco-editor-background {
+  background-color: #00000000 !important;
+}
+.split-view-view > .part .margin {
+  background-color: #00000022 !important;
+}
+.part.editor > .content {
+  background-color: #05050544 !important;
+}
+.part.editor .monaco-editor {
+  background-color: #05050544 !important;
+}
+.editor-group-container .editor-container {
+  background-color: #05050544 !important;
+}
+.editor-group-container .tabs {
+  background-color: #05050544 !important;
+}
+.tabs-container .tab  {
+  background-color: #05050544 !important;
+}
+.tabs-breadcrumbs .monaco-breadcrumbs  {
+  background-color: #05050544 !important;
+}
+.monaco-list .monaco-list-rows  {
+  background-color: #00000000 !important;
+}
