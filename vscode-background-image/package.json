@@ -7,17 +7,19 @@
   "license": "MIT",
   "version": "0.0.3",
   "private": true,
-  "repository-todo": {
+  "repository": {
     "type": "git",
-    "url": "https://github.com/nidefawl/xxxx"
+    "url": "https://github.com/nidefawl/vscode-custom-loader"
   },
-  "homepage-todo": "https://github.com/nidefawl/xxxx",
+  "homepage": "https://github.com/nidefawl/vscode-custom-loader",
   "main": "vscode-background-image.js",
   "engines": {
     "vscode": "^1.63.0"
   },
   "keywords": [
-    "wallpaper", "background", "background image"
+    "wallpaper",
+    "background",
+    "background image"
   ],
   "categories": [
     "Other",

@@ -186,7 +186,7 @@ async function activate(context) {
     });
   }, this);
 
-  context.subscriptions.push(cmdDispPrev, cmdDispNext, cmdDispToggle, cmdDispPick, cmdDispSetFolder);
+  context.subscriptions.push(cmdDisp1, cmdDisp2, cmdDispPrev, cmdDispNext, cmdDispToggle, cmdDispPick, cmdDispSetFolder);
 
   let btn1 = window.createStatusBarItem("backgroundimage.statusbar.prev", vscode.StatusBarAlignment.Right, 5);
   let btn2 = window.createStatusBarItem("backgroundimage.statusbar.toggle", vscode.StatusBarAlignment.Right, 4);
@@ -235,10 +235,21 @@ async function activate(context) {
   instance.registerContribution(context.extension.id, moduleList)
 
   lazyGetRPCChannel().then(rpc=>{
+    let isFirstRun = context.globalState.get('isFirstRun', true);
+    context.globalState.update('isFirstRun', false);
     const wsConfig = workspace.getConfiguration();
-    const backgroundImageCurrent = wsConfig.get('backgroundimage.image', null);
-    if (typeof (backgroundImageCurrent) === 'string' && backgroundImageCurrent.length) {
-      rpc.send('background', 'set', backgroundImageCurrent);
+    const bgEnabled = wsConfig.get('backgroundimage.enabled', true);
+    if (bgEnabled) {
+      const backgroundImageCurrent = wsConfig.get('backgroundimage.image', null);
+      const backgroundImageFolder = wsConfig.get('backgroundimage.folder', null);
+      if (typeof (backgroundImageCurrent) === 'string' && backgroundImageCurrent.length) {
+        rpc.send('background', 'set', backgroundImageCurrent);
+      } else if (isFirstRun && !(typeof (backgroundImageFolder) === 'string' && backgroundImageFolder.length)) {
+        setTimeout(() => {
+          wsConfig.update('backgroundimage.image', 'https://w.wallhaven.cc/full/j3/wallhaven-j3wqwm.jpg');
+          window.showInformationMessage('You can now set a background image folder', {}, 'Set image folder', 'Ignore');
+        }, 1500);
+      }
     }
   });
 }
