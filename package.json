@@ -10,21 +10,20 @@
   "license": "MIT",
   "version": "0.0.3",
   "private": true,
-  "repository-todo": {
+  "repository": {
     "type": "git",
-    "url": "https://github.com/nidefawl/xxxx"
+    "url": "https://github.com/nidefawl/vscode-custom-loader"
   },
-  
   "scripts": {
     "lint": "eslint .",
-    "dist-custom-loader": "cd extension && vsce package --pre-release --no-git-tag-version --yarn --no-dependencies -o ../dist",
-    "dist-background-image": "cd vscode-background-image && vsce package --pre-release --no-git-tag-version --yarn --no-dependencies -o ../dist",
-    "dist": "yarn dist-custom-loader && yarn dist-background-image"
+    "dist": "node dist-package-task.mjs"
   },
   "devDependencies": {
     "@types/node": "14.x",
     "@types/vscode": "^1.63.1",
     "eslint": "^8.7.0",
-    "vsce": "^2.6.4"
+    "vsce": "^2.6.4",
+    "yauzl": "^2.10.0",
+    "yazl": "^2.5.1"
   }
 }
