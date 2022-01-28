@@ -49,7 +49,7 @@ class RPCChannelHandler_ExtHost {
         return chan.recv(args);
       }
     }
-    logChannel?.appendLine("RPC Message has not been handled")
+    extensionLog("RPC Message has not been handled")
     console.warn('$recv', 'Message has not been handled', args, this.channels);
     return "Message has not been handled";
   }
@@ -81,6 +81,8 @@ var logChannel = null;
  * @param {any} msg
  */
 function extensionLog(msg) {
+  if (!logChannel)
+    logChannel = vscode.window.createOutputChannel('CustomLoader');
   logChannel?.appendLine(msg)
   console.log(msg);
 }
@@ -90,7 +92,6 @@ class VsCodeCustomizeExtension {
    * @param {vscode.ExtensionContext} context
    */
   constructor(context) {
-    logChannel = vscode.window.createOutputChannel('CustomLoader');
     this.ctxt = context;
     const ext = this;
     this.rpcPromise = new Promise((resolve, reject) => {
@@ -107,20 +108,14 @@ class VsCodeCustomizeExtension {
       });
     }).catch((error) => {
       console.error('RPC Hook failed', error);
-      logChannel?.appendLine('RPC Hook failed');
+      extensionLog('RPC Hook failed');
     });
 
-/*     vscode.workspace.onDidChangeConfiguration(evt => {
-      if (evt.affectsConfiguration('vscodecustomloader')) {
-        console.log('configuration changed');
-      }
-    }, this, this.ctxt.subscriptions); */
-
+    let cmdPatch = vscode.commands.registerCommand('vscode-custom-loader.patchinstallation', this._patchInstallation, this);
     let cmdReset = vscode.commands.registerCommand('vscode-custom-loader.reset', this._resetRegistry, this);
-    this.ctxt.subscriptions.push(logChannel);
-    this.ctxt.subscriptions.push(cmdReset);
+    let cmdDump = vscode.commands.registerCommand('vscode-custom-loader.show', this._dumpRegistry, this);
 
-    // extensionLog(`${this.ctxt.extension.id} installed at ${this.ctxt.asAbsolutePath('vscode-extension.js')}`);
+    this.ctxt.subscriptions.push(logChannel, cmdPatch, cmdReset, cmdDump);
   }
   _createRpcChannelHandler(rpcProtocol) {
       //TODO register disposable to handle extension host exit
@@ -128,9 +123,15 @@ class VsCodeCustomizeExtension {
       this.rpcChannelHandler = new RPCChannelHandler_ExtHost(rpcProtocol);
 
       let timeout = setTimeout(() => {
-        const msg = 'Custom Loader hook is not installed.\n\nPlease patch bootstrap-window.js';
+        const msg = 'Custom Loader hook is not installed. Do you want to install the required patch now?';
         extensionLog(msg);
-          vscode.window.showInformationMessage(msg);
+        vscode.window.showInformationMessage(msg, {}, 'Install Patch', 'Ignore').
+          then((response)=>{
+            if (response == 'Install Patch') {
+              return vscode.commands.executeCommand('vscode-custom-loader.patchinstallation');
+            }
+          });
+          
         }, 12000);
         this.rpcChannelHandler.registerChannelHandler('customloader', {
         recv: function(args) {
@@ -152,13 +153,85 @@ class VsCodeCustomizeExtension {
 
   }
 
+  _patchInstallation() {
+    extensionLog("Patch bootstrap-window.js");
+    try {
+      const njspath = require('path');
+      const njsfs = require('fs');
+      const pathVsCodeInstallation = require.main.path;
+      const pathBoostrapWindowJs = njspath.join(pathVsCodeInstallation, 'bootstrap-window.js');
+      const pathBoostrapWindowJsBak = njspath.join(pathVsCodeInstallation, 'bootstrap-window.js.without-customloader');
+      const pathPatchTemplate = this.ctxt.asAbsolutePath('patch/bootstrap-window-patch.js');
+      let pathHookModule = this.ctxt.asAbsolutePath('hook');
+      if (njspath.sep != njspath.posix.sep) // replace backslash with forward on win32
+        pathHookModule = pathHookModule.split(njspath.sep).join(njspath.posix.sep);
+
+      if (![pathBoostrapWindowJs, pathPatchTemplate].every(p=>njsfs.statSync(p).isFile)
+          || ![pathVsCodeInstallation, pathHookModule].every(p=>njsfs.statSync(p).isDirectory)) {
+        throw Error(`Some files are missing. Maybe reinstall the extension`);
+      }
+
+      const srcPatchTemplate = njsfs.readFileSync(pathPatchTemplate, {encoding: 'utf8', flag: 'r'});
+      const srcBootstrapWindowJs = njsfs.readFileSync(pathBoostrapWindowJs, {encoding: 'utf8', flag: 'r'});
+    
+      const loaderCode = srcPatchTemplate.replace('<absPathHookModule>', pathHookModule);
+      const regexPatchGreedy = /([\s\S]+?)(\/\/BEGIN PATCH LOADER[\s\S]+\/\/END PATCH LOADER)([\s\S]+)/;
+      const srcMatches = srcBootstrapWindowJs.match(regexPatchGreedy);
+      let before, after;
+      if (!srcMatches) {
+        before = srcBootstrapWindowJs;
+        before += '\n';
+        after = '\n';
+      } else {
+        if (!(srcMatches?.length == 4) || !(srcMatches[3]===''&& srcMatches[2]===undefined || srcMatches.every((v)=>typeof(v)==='string'))) {
+          throw Error(`Unexpected state of file ${pathBoostrapWindowJs}.\nMaybe try a fresh VSCode installation`);
+        }
+        before = srcMatches[1];
+        after = srcMatches.length === 4 && srcMatches[3].length > 0 ? srcMatches[3] : '\n';
+      }
+    
+      // Backup bootstrap-window.js once (Tho this way the file might be outdated if VSCode updates)
+      try {
+        njsfs.copyFileSync(pathBoostrapWindowJs, pathBoostrapWindowJsBak, njsfs.constants.COPYFILE_EXCL)
+      } catch (error) {
+        if (error.code !== 'EEXIST')
+          throw error;
+      }
+    
+      let contentsPatched = before;
+      contentsPatched += loaderCode;
+      contentsPatched += after;
+
+      njsfs.writeFileSync(pathBoostrapWindowJs, contentsPatched, {encoding: 'utf8', flag: 'w'});
+
+      extensionLog(`Patched ${pathBoostrapWindowJs} to load ${pathHookModule}`);
+      return vscode.window.showInformationMessage('Patched bootstrap-window.js. Please reload the window', {}, 'Reload window', 'Ignore').
+        then((response)=>{
+          if (response == 'Reload window') {
+            return vscode.commands.executeCommand('workbench.action.reloadWindow');
+          }
+        });
+    } catch (error) {
+      extensionLog("Patching bootstrap-window failed");
+      extensionLog(''+error);
+      logChannel?.show(false);
+      return vscode.window.showInformationMessage(`Error occured while installing patch. See log channel for more information`);
+    }
+  }
 
   _resetRegistry() {
-
-    extensionLog(this.ctxt.extension);
+    extensionLog("Reset registry");
     this.ctxt.globalState.update(__CONTRIB_REG_NAME, []);
     vscode.window.showInformationMessage(`Reset registry`);
   }
+
+  _dumpRegistry() {
+    let apiReg = this.ctxt.globalState.get(__CONTRIB_REG_NAME, []);
+    console.log(apiReg);
+    extensionLog(JSON.stringify(apiReg, null, 2));
+    logChannel?.show(false);
+  }
+  
   async registerRpcHandler(srcExtId, handler) {
     await this.rpcPromise;
     return this.rpcChannelHandler.registerChannelHandler(srcExtId, handler);
@@ -179,7 +252,7 @@ class VsCodeCustomizeExtension {
     this.ctxt.globalState.update(__CONTRIB_REG_NAME, apiReg);
     if (modified) {
       extensionLog(`registerContribution from ${srcExtId}`);
-      vscode.window.showInformationMessage('New extension registered\nPlease reload the window', {}, 'Reload window', 'Ignore').
+      vscode.window.showInformationMessage('New extension registered. Please reload the window', {}, 'Reload window', 'Ignore').
         then((response)=>{
           if (response == 'Reload window') {
             return vscode.commands.executeCommand('workbench.action.reloadWindow');
