@@ -22,8 +22,10 @@
     "background image"
   ],
   "categories": [
-    "Other",
-    "UI"
+    "Other", "Themes"
+  ],
+  "extensionKind": [
+    "ui"
   ],
   "activationEvents": [
     "*"

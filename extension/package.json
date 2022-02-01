@@ -18,7 +18,10 @@
   },
   "categories": [
     "Other",
-    "UI"
+    "Themes"
+  ],
+  "extensionKind": [
+    "ui"
   ],
   "activationEvents": [
     "*"
