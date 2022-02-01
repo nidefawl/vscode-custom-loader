@@ -1,42 +1,48 @@
-
-#workbench\.parts\.sidebar {
-  background-color: #05050544 !important;
-}
-#workbench\.parts\.sidebar .title {
-  background-color: #05050522 !important;
-}
-
-#workbench\.parts\.auxiliarybar {
-  background-color: #05050544 !important;
-}
-#workbench\.parts\.auxiliarybar .title {
-  background-color: #05050522 !important;
-}
-
-.split-view-view > .part .monaco-editor-background {
-  background-color: #00000000 !important;
-}
-.split-view-view > .part .margin {
-  background-color: #00000022 !important;
+:root {
+  --bgimage-bgcolor: #050505aa;
 }
 .part.editor > .content {
-  background-color: #05050544 !important;
+  background-color: var(--bgimage-bgcolor) !important;
 }
-.part.editor .monaco-editor {
-  background-color: #05050544 !important;
+.editor-group-container > .editor-container {
+  background-color: #00000000 !important;
 }
-.editor-group-container .editor-container {
-  background-color: #05050544 !important;
+.monaco-editor .monaco-editor-background {
+  background-color: #00000000 !important;
 }
-.editor-group-container .tabs {
-  background-color: #05050544 !important;
+.monaco-editor {
+  background-color: #00000000 !important;
 }
-.tabs-container .tab  {
-  background-color: #05050544 !important;
+.monaco-editor .margin {
+  background-color: #00000022 !important;
 }
-.tabs-breadcrumbs .monaco-breadcrumbs  {
-  background-color: #05050544 !important;
+.editor-group-container > .tabs {
+  background-color: #00000000 !important;
+}
+.editor-group-container > .tabs .tabs-container > .tab  {
+  background-color: #00000000 !important;
+}
+.editor-group-container > .tabs .tab.active {
+  background-color: #05050588 !important;
+}
+.editor-group-container > .tabs > .tabs-breadcrumbs .monaco-breadcrumbs  {
+  background-color: #00000000 !important;
 }
 .monaco-list .monaco-list-rows  {
   background-color: #00000000 !important;
+}
+.split-view-view > .pane > .pane-header {
+  background-color: var(--vscode-badge-background) !important;
+}
+#workbench\.parts\.panel {
+  background-color: var(--bgimage-bgcolor) !important;
+}
+#workbench\.parts\.sidebar {
+  background-color: var(--bgimage-bgcolor) !important;
+}
+#workbench\.parts\.auxiliarybar {
+  background-color: var(--bgimage-bgcolor) !important;
+}
+.split-view-view > .part > .title {
+  background-color: var(--vscode-editor-selectionBackground) !important;
 }

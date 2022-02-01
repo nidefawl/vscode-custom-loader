@@ -1,7 +1,7 @@
 
 .monaco-workbench { forced-color-adjust: none; }
-
-.monaco-workbench { background-color: rgb(0, 0, 0); background-size: cover; }
+/* .monaco-workbench { background-color: rgb(235, 0, 0); background-size: cover; } */
+.monaco-workbench { background-size: cover; }
 
 .monaco-workbench {
 
