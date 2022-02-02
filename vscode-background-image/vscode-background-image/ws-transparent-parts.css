@@ -31,9 +31,6 @@
 .monaco-list .monaco-list-rows  {
   background-color: #00000000 !important;
 }
-.split-view-view > .pane > .pane-header {
-  background-color: var(--vscode-badge-background) !important;
-}
 #workbench\.parts\.panel {
   background-color: var(--bgimage-bgcolor) !important;
 }
@@ -44,5 +41,5 @@
   background-color: var(--bgimage-bgcolor) !important;
 }
 .split-view-view > .part > .title {
-  background-color: var(--vscode-editor-selectionBackground) !important;
+  background-color: var(--vscode-activityBar-background) !important;
 }
