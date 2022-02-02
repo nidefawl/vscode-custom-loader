@@ -7,6 +7,9 @@
 .editor-group-container > .editor-container {
   background-color: #00000000 !important;
 }
+.editor-instance > .monaco-editor-background {
+  background-color: #00000000 !important;
+}
 .monaco-editor .monaco-editor-background {
   background-color: #00000000 !important;
 }
@@ -42,4 +45,7 @@
 }
 .split-view-view > .part > .title {
   background-color: var(--vscode-activityBar-background) !important;
+}
+.monaco-editor .zone-widget .zone-widget-container {
+  background-color: #05050588 !important;
 }
