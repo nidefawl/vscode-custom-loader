@@ -75,7 +75,7 @@ class VSCodeHook extends Log {
     this.registrySvcDesc = null;
 
     if (PRINT_LOG_INSTANCES) {
-      this.evts.on('instance', (typeName,_)=>console.warn(typeName));
+      this.evts.on('instance', (typeName,_)=>this.warn(typeName));
     }
   }
   require(reqSvcName) {
@@ -208,7 +208,7 @@ class VSCodeHook extends Log {
     const timeout = 8000;
     setTimeout(()=> {
       if (this.numRequires > 0) {
-        console.error(`${this.numRequires} require where not fullfilled after ${timeout}ms`, this.requires);
+        this.logErr(`${this.numRequires} require where not fullfilled after ${timeout}ms`, this.requires);
       }
     }, timeout, this);
 
@@ -405,23 +405,27 @@ exports.bootstrapWindow = () => {
         // sadly there is no onExtensionHostStarted event (for the local ext host)
         let subscr = null;
         subscr = extensionService.onDidChangeExtensionsStatus((extensionIds)=>{
-
-          const extHostManager = extensionService._getExtensionHostManager(0); // 0 == LocalProcess
-          if (!extHostManager) {
-            return;
-          }
-
-          const _rpcProtocol = extHostManager._rpcProtocol
-          if (!_rpcProtocol) {
-            return;
-          }
-
-          for (const extensionId of extensionIds) {
-            if (extensionId.value.toLowerCase().indexOf("vscode-custom-loader")>-1) {
-              subscr.dispose();
-              installRpc(_rpcProtocol);
-              break;
+          try {
+            const extHostManager = extensionService._extensionHostManagers[0]; // 0 == LocalProcess
+            if (!extHostManager) {
+              return;
             }
+
+            const _rpcProtocol = extHostManager._rpcProtocol
+            if (!_rpcProtocol) {
+              return;
+            }
+
+            for (const extensionId of extensionIds) {
+              if (extensionId.value.toLowerCase().indexOf("vscode-custom-loader")>-1) {
+                subscr.dispose();
+                installRpc(_rpcProtocol);
+                break;
+              }
+            }
+          } catch(error) {
+            subscr.dispose();
+            vscHook.logErr(error);
           }
         });
 
@@ -525,7 +529,6 @@ exports.bootstrapWindow = () => {
             clearTimeout(initTimerHandle);
             initTimerHandle = null;
           }
-          console.log('received init');
         }
       }
     };

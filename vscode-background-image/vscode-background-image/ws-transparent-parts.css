@@ -1,5 +1,5 @@
 :root {
-  --bgimage-bgcolor: #050505aa;
+  --bgimage-bgcolor: #050505c4;
 }
 .part.editor > .content {
   background-color: var(--bgimage-bgcolor) !important;
@@ -23,16 +23,22 @@
   background-color: #00000000 !important;
 }
 .editor-group-container > .tabs .tabs-container > .tab  {
-  background-color: #00000000 !important;
-}
-.editor-group-container > .tabs .tab.active {
-  background-color: #05050588 !important;
+  background-color: #00000000;
 }
 .editor-group-container > .tabs > .tabs-breadcrumbs .monaco-breadcrumbs  {
   background-color: #00000000 !important;
 }
 .monaco-list .monaco-list-rows  {
   background-color: #00000000 !important;
+}
+.monaco-list .monaco-list-row.selected {
+  background-color: #05050588 !important;
+}
+.monaco-list .monaco-list-row.focused {
+  background-color: #05050588 !important;
+}
+.monaco-list .monaco-list-row:hover {
+  background-color: #05050588 !important;
 }
 #workbench\.parts\.panel {
   background-color: var(--bgimage-bgcolor) !important;
