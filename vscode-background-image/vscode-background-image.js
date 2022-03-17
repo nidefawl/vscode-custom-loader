@@ -5,7 +5,8 @@ const { commands, workspace, window, Uri } = vscode;
 const moduleList = [
   "vscode-background-image/main.js",
   "vscode-background-image/ws-background-image.css",
-  "vscode-background-image/ws-transparent-parts.css"
+  "vscode-background-image/ws-transparent-parts.css",
+  "vscode-background-image/ws-compact-layout.css"
 ];
 
 /**

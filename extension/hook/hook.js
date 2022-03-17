@@ -26,6 +26,12 @@ function _overrideArgs(where, name, cb) {
     where.prototype[name] = prevFunc;
   };
 }
+function _overrideFunc(where, name, cb) {
+  const prevFunc = where.prototype[name];
+  where.prototype[name] = function () {
+    return cb.apply(this, [prevFunc, arguments]);
+  };
+}
 
 const KEEP_RUNTIME_HOOKS = false;
 const PRINT_LOG_INSTANCES = false;
@@ -263,6 +269,68 @@ class VSCodeHook extends Log {
         thisLoader.hookDisposeList.push(hookDispose);
       }
     );
+
+    this.vsAmdLoader(
+      ['vs/workbench/browser/parts/activitybar/activitybarPart'],
+      function (vs_activitybar) {
+        const {ActivitybarPart} = vs_activitybar;
+        const newSize = 32;
+        ActivitybarPart.ACTION_HEIGHT = newSize
+        _overrideArgs(vs_activitybar.ActivitybarPart, 'createCompositeBar', function (prevFuncArgsApplied, prevArgs) {
+          this.ACTION_HEIGHT = newSize
+          this.minimumWidth = newSize;
+          this.maximumWidth = newSize;
+          return prevFuncArgsApplied();
+        });
+      },
+      function(err) {
+        thisLoader.logErr("err", err);
+      });
+    this.vsAmdLoader(
+      ['vs/workbench/browser/parts/editor/tabsTitleControl'],
+      function (vs_tabsTitleControl) {
+        const {TabsTitleControl} = vs_tabsTitleControl;
+        TabsTitleControl.TAB_HEIGHT = 24
+        TabsTitleControl.TAB_WIDTH.compact = 25;
+        TabsTitleControl.TAB_WIDTH.shrink = 48;
+        TabsTitleControl.TAB_WIDTH.fit = 80;
+      },
+      function(err) {
+        thisLoader.logErr("err", err);
+      });
+    this.vsAmdLoader(
+      ['vs/workbench/browser/parts/titlebar/titlebarPart'],
+      function (vs_titlebarPart) {
+        let desc = Object.getOwnPropertyDescriptor(vs_titlebarPart.TitlebarPart.prototype, 'minimumHeight');
+        const prevFunc = desc.get;
+        desc.get = function() {
+          return parseInt(prevFunc.call(this)*0.75);
+        };
+        Object.defineProperty(vs_titlebarPart.TitlebarPart.prototype, 'minimumHeight', desc);
+      },
+      function(err) {
+        thisLoader.logErr("err", err);
+      });
+    this.vsAmdLoader(
+      ['vs/workbench/browser/part'],
+      function (vs_parts) {
+        const VSCODE_COMPONENT_TITLE_HEIGHT = 35;
+        const ADJUSTED_TITLE_HEIGHT = 24;
+        _overrideFunc(vs_parts.Part, 'layoutContents', function (prevFunc, prevArgs) {
+          if (!this.options.hasTitle) {
+            const dim = prevFunc.call(this, ...prevArgs);
+            return dim;
+          }
+          // Fix contentSize calculation: Pass in delta height to content height
+          const extraHeight = VSCODE_COMPONENT_TITLE_HEIGHT - ADJUSTED_TITLE_HEIGHT;
+          const dimensions = prevFunc.call(this, prevArgs[0], prevArgs[1] + extraHeight);
+          dimensions.titleSize.height = Math.min(prevArgs[1], ADJUSTED_TITLE_HEIGHT);
+          return dimensions;
+        });
+      },
+      function(err) {
+        thisLoader.logErr("err", err);
+      });
   }
 
   _uninstallHooks() {

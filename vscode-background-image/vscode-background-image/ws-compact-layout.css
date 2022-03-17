@@ -1,0 +1,212 @@
+:root {
+  --ws-compact-activitybar-width: 32px !important;
+  --ws-compact-editortabs-height: 24px !important;
+  --ws-compact-editortabs-fontsize: 16px;
+  --ws-compact-component-title-height: 24px !important;
+}
+/* Adjust sidebar width */
+.monaco-workbench .part.activitybar {
+	width: var(--ws-compact-activitybar-width);
+}
+.monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::before,
+.monaco-workbench .activitybar > .content .composite-bar > .monaco-action-bar .action-item::after {
+	width: var(--ws-compact-activitybar-width);
+}
+
+.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label {
+	width: var(--ws-compact-activitybar-width);
+	height: var(--ws-compact-activitybar-width);
+}
+.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label:not(.codicon) {
+	font-size: 12px !important;
+	line-height: 28px !important;
+	padding: 0 0 0 32px !important;
+}
+.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label.codicon {
+	font-size: 20px !important;
+	align-items: center;
+	justify-content: center;
+}
+.monaco-workbench .activitybar>.content :not(.monaco-menu)>.monaco-action-bar .badge .badge-content {
+  top: calc(var(--ws-compact-activitybar-width)/2) !important;
+  height: calc(var(--ws-compact-activitybar-width)/3) !important;
+  line-height: calc(var(--ws-compact-activitybar-width)/3) !important;
+  right: calc(var(--ws-compact-activitybar-width)/8) !important;
+}
+
+/* Editor tabs height */
+/* Tabs Container */
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container {
+	height:  var(--ws-compact-editortabs-height);
+  outline: unset !important;
+}
+/* Tab */
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab {
+	padding-left: 2px !important;
+	height:  var(--ws-compact-editortabs-height);
+  outline: unset !important;
+}
+.monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab>.tab-actions {
+	width: var(--ws-compact-editortabs-height);
+}
+.monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab>.tab-actions>.monaco-action-bar {
+	width: var(--ws-compact-editortabs-height);
+}
+/* Tab Label */
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab .tab-label {
+	height:  var(--ws-compact-editortabs-height);
+	line-height: var(--ws-compact-editortabs-height) !important;
+  outline: unset !important;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-label * {
+  font-size: var(--ws-compact-editortabs-fontsize) !important;
+	line-height: calc(var(--ws-compact-editortabs-height) - 1px) !important;
+}
+.monaco-workbench .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab > .tab-actions .action-label.codicon {
+	font-size: calc(var(--ws-compact-editortabs-height)*0.6) !important;
+  outline: unset !important;
+  justify-content: flex-end;
+  padding: 0;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .editor-actions {
+	padding: 0 4px 0 4px;
+	height: var(--ws-compact-editortabs-height);
+  outline: unset !important;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .monaco-icon-label::before {
+	height: var(--ws-compact-editortabs-height);
+	width: calc(var(--ws-compact-editortabs-height) * 0.75);
+  line-height: var(--ws-compact-editortabs-height); /* tweak the icon size of the editor labels when icons are enabled */
+  margin-left: calc(var(--ws-compact-editortabs-height) * 0.2) !important;
+  background-size: calc(var(--ws-compact-editortabs-height) * 0.75) !important;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .monaco-icon-label::after {
+  margin: unset;
+  line-height: var(--ws-compact-editortabs-height);
+  margin-left: calc(var(--ws-compact-editortabs-height) * 0.2) !important;
+}
+
+/* Adjust editor tabs width */
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.sizing-fit {
+	width: 80px;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.sizing-shrink {
+	min-width: 48px;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.sizing-fit.sticky-compact,
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.sizing-shrink.sticky-compact {
+	width: 25px;
+	min-width: 25px;
+	max-width: 25px;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.sizing-fit.sticky-shrink,
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.sizing-shrink.sticky-shrink {
+	width: 48px;
+	min-width: 48px;
+	max-width: 48px;
+}
+
+/* Adjust component title height */
+.monaco-workbench .part>.title {
+  padding-left: calc(var(--ws-compact-component-title-height)/4);
+  padding-right: calc(var(--ws-compact-component-title-height)/4);
+  height: var(--ws-compact-component-title-height);
+  background-color: var(--vscode-activityBar-background) !important;
+}
+.monaco-workbench .part>.title>.title-label {
+  height: var(--ws-compact-component-title-height);
+  line-height: var(--ws-compact-component-title-height);
+}
+.monaco-workbench .part>.title>.title-actions {
+	height: unset !important;
+	line-height: unset !important;
+}
+.monaco-workbench .part>.title>.panel-switcher-container>.monaco-action-bar {
+	height: 100% !important;
+  line-height: 100% !important;
+}
+.monaco-workbench .part>.title>.panel-switcher-container>.monaco-action-bar .active-item-indicator {
+  display: none !important;
+}
+.monaco-action-bar .monaco-inputbox {
+  height: calc(var(--ws-compact-component-title-height)*0.9) !important;
+}
+.monaco-action-bar .monaco-select-box {
+  height: calc(var(--ws-compact-component-title-height)*0.9) !important;
+}
+
+/* Adjust titlebar height */
+.monaco-workbench .part.titlebar {
+	line-height: 22px;
+	height: 22px;
+}
+.monaco-workbench .part.titlebar .window-title {
+	font-size: 14px;
+}
+.monaco-workbench .part.titlebar .menubar {
+	font-size: 14px;
+  height: 22px;
+  line-height: 22px;
+}
+.monaco-workbench .part.titlebar .action-item .codicon {
+	height: 12px !important;
+}
+.monaco-workbench.web .part.titlebar,
+.monaco-workbench.windows .part.titlebar,
+.monaco-workbench.linux .part.titlebar {
+	height: 22px;
+	line-height: 22px;
+}
+.monaco-workbench.web .part.titlebar .titlebar-container,
+.monaco-workbench.windows .part.titlebar .titlebar-container,
+.monaco-workbench.linux .part.titlebar .titlebar-container {
+	height: 22px;
+	line-height: 22px;
+}
+.monaco-workbench .part.titlebar .window-appicon {
+	width: 22px;
+}
+
+.monaco-workbench .part.titlebar .window-appicon:not(.codicon) {
+	background-size: 12px;
+}
+.monaco-workbench .part.titlebar .window-appicon .home-bar-icon-badge {
+	right: 9px;
+	bottom: 6px;
+	width: 8px;
+	height: 8px;
+	background-size: 8px;
+}
+.monaco-workbench .part.titlebar .window-appicon.codicon {
+	line-height: 22px;
+}
+.monaco-workbench .part.titlebar .window-controls-container {
+	right: unset !important;
+	min-width: unset !important;
+  justify-content: flex-end !important;
+}
+.monaco-workbench:not(.mac):not(.web) .part.titlebar .window-controls-container.show-layout-control > .layout-dropdown-container {
+  min-width: unset !important;
+	line-height: 22px !important;
+	width: 32px !important;
+	font-size: 16px !important;
+}
+.monaco-workbench .part.titlebar .window-controls-container > .window-icon {
+  min-width: unset !important;
+  line-height: 22px !important;
+	width: 32px !important;
+	font-size: 16px !important;
+}
+
+
+/* Hide active editor tab border */
+.tab-border-top-container {
+  height: 0px !important;
+  display: none !important;
+}
+
+/* Fix xterm focused border in high contrast on windows showing partial outlines */
+.xterm.focus::before {
+  border-color: unset !important;
+  border: 0px !important;
+}
