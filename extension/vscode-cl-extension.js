@@ -1,5 +1,6 @@
 const vscode = require('vscode');
-
+const os = require('os');
+const sudo = require('sudo-prompt');
 // This should not be allowed from extensions:
 const amdLoader = module['parent'].exports;
 const { RPCProtocol } = amdLoader('vs/workbench/services/extensions/common/rpcProtocol');
@@ -93,6 +94,7 @@ class VsCodeCustomizeExtension {
    */
   constructor(context) {
     this.ctxt = context;
+    this.userIsPatching = false;
     const ext = this;
     this.rpcPromise = new Promise((resolve, reject) => {
       let disposeOverride = undefined;
@@ -123,17 +125,19 @@ class VsCodeCustomizeExtension {
       this.rpcChannelHandler = new RPCChannelHandler_ExtHost(rpcProtocol);
 
       let timeout = setTimeout(() => {
-        const msg = 'Custom Loader hook is not installed. Do you want to install the required patch now?';
-        extensionLog(msg);
-        vscode.window.showInformationMessage(msg, {}, 'Install Patch', 'Ignore').
-          then((response)=>{
-            if (response == 'Install Patch') {
-              return vscode.commands.executeCommand('vscode-custom-loader.patchinstallation');
-            }
-          });
+        if (!this.userIsPatching) {
+          const msg = 'Custom Loader hook is not installed. Do you want to install the required patch now?';
+          extensionLog(msg);
+          vscode.window.showInformationMessage(msg, {}, 'Install Patch', 'Ignore').
+            then((response)=>{
+              if (response == 'Install Patch') {
+                return vscode.commands.executeCommand('vscode-custom-loader.patchinstallation');
+              }
+            });
+        }
           
-        }, 12000);
-        this.rpcChannelHandler.registerChannelHandler('customloader', {
+      }, 12000);
+      this.rpcChannelHandler.registerChannelHandler('customloader', {
         recv: function(args) {
           if (args[1] == 'init') {
             if (timeout) {
@@ -154,6 +158,7 @@ class VsCodeCustomizeExtension {
   }
 
   _patchInstallation() {
+    this.userIsPatching = true;
     extensionLog("Patch bootstrap-window.js");
     try {
       const njspath = require('path');
@@ -189,28 +194,44 @@ class VsCodeCustomizeExtension {
         before = srcMatches[1];
         after = srcMatches.length === 4 && srcMatches[3].length > 0 ? srcMatches[3] : '\n';
       }
-    
-      // Backup bootstrap-window.js once (Tho this way the file might be outdated if VSCode updates)
-      try {
-        njsfs.copyFileSync(pathBoostrapWindowJs, pathBoostrapWindowJsBak, njsfs.constants.COPYFILE_EXCL)
-      } catch (error) {
-        if (error.code !== 'EEXIST')
-          throw error;
-      }
-    
       let contentsPatched = before;
       contentsPatched += loaderCode;
       contentsPatched += after;
-
-      njsfs.writeFileSync(pathBoostrapWindowJs, contentsPatched, {encoding: 'utf8', flag: 'w'});
-
-      extensionLog(`Patched ${pathBoostrapWindowJs} to load ${pathHookModule}`);
-      return vscode.window.showInformationMessage('Patched bootstrap-window.js. Please reload the window', {}, 'Reload window', 'Ignore').
-        then((response)=>{
-          if (response == 'Reload window') {
-            return vscode.commands.executeCommand('workbench.action.reloadWindow');
-          }
-        });
+      const isWindows = os.platform() === 'win32';
+      const scriptExtension = isWindows ? "cmd" : "sh"
+      const osTempDir = os.tmpdir();
+      const tempdir = njsfs.mkdtempSync(`${osTempDir}${njspath.posix.sep}`);
+      const scriptFile = [tempdir, `patch.${scriptExtension}`].join(njspath.posix.sep);
+      const patchedBootstrap = [tempdir, 'bootstrap-window.js'].join(njspath.posix.sep);
+      njsfs.writeFileSync(patchedBootstrap, contentsPatched, {encoding: 'utf8', flag: 'w'});
+      if (!isWindows) {
+        njsfs.writeFileSync(scriptFile, `#!/bin/sh\n
+cd "${tempdir}"
+cp "${pathBoostrapWindowJs}" "${pathBoostrapWindowJsBak}"
+cp "${patchedBootstrap}" "${pathBoostrapWindowJs}"
+`);
+      } else {
+        njsfs.writeFileSync(scriptFile, `
+cd "${tempdir}"
+copy /Y "${pathBoostrapWindowJs}" "${pathBoostrapWindowJsBak}"
+copy /Y "${patchedBootstrap}" "${pathBoostrapWindowJs}"
+`);
+      }
+      let scriptCommand = scriptFile;
+      if (!isWindows) scriptCommand = `/bin/sh ${scriptCommand}`;
+      sudo.exec(scriptCommand, {name: 'VSCode CustomLoader Boostrap Patcher'},
+        async function(error, stdout, stderr) {
+          if (error) throw error;
+          extensionLog(`Patched ${pathBoostrapWindowJs} to load ${pathHookModule}`);
+          vscode.window.showInformationMessage('Patched bootstrap-window.js. Please reload the window', {}, 'Reload window', 'Ignore').
+            then((response)=>{
+              if (response == 'Reload window') {
+                return vscode.commands.executeCommand('workbench.action.reloadWindow');
+              }
+            });
+        }
+      );
+      return undefined;
     } catch (error) {
       extensionLog("Patching bootstrap-window failed");
       extensionLog(''+error);

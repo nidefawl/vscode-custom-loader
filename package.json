@@ -1,14 +1,13 @@
 {
   "name": "vscode-custom-loader",
   "workspaces": [
-    "extension",
     "hook",
     "vscode-background-image"
   ],
   "description": "VSCode Custom Loader Project",
   "author": "nidefawl",
   "license": "MIT",
-  "version": "0.0.7",
+  "version": "0.1.2",
   "private": true,
   "repository": {
     "type": "git",
