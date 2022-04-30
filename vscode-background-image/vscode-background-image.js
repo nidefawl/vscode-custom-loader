@@ -92,8 +92,11 @@ async function activate(context) {
     return undefined;
   }
   async function setImageAndUpdateConfig(absPath) {
-    const rpc = await lazyGetRPCChannel();
-    await workspace.getConfiguration().update('backgroundimage.image', absPath);
+    try {
+      await workspace.getConfiguration().update('backgroundimage.image', absPath);
+    } catch (_) {
+      /* ignore */
+    }
   }
   let cmdDisp1 = commands.registerCommand(`backgroundimage.cmd.register`, async () => {
     const instance = await getLoaderAPI();
@@ -115,6 +118,10 @@ async function activate(context) {
     const wsConfig = workspace.getConfiguration();
     let enabled = !wsConfig.get('backgroundimage.enabled', true);
     return wsConfig.update('backgroundimage.enabled', enabled);
+  }, this);
+  let cmdDispRandom = commands.registerCommand(`backgroundimage.cmd.pickRandom`, async () => {
+    const imguriOrUndef = await getImageByOffset(Math.round(Math.random()*100000));
+    if (imguriOrUndef) setImageAndUpdateConfig(imguriOrUndef.fsPath);
   }, this);
 
   let cmdDispPick = commands.registerCommand(`backgroundimage.cmd.pickimage`, async () => {
@@ -191,12 +198,12 @@ async function activate(context) {
     return getConfigStringOrUndefined('backgroundimage.folder');
   }, this);
 
-  context.subscriptions.push(cmdDisp1, cmdDisp2, cmdDispPrev, cmdDispNext, cmdDispToggle, cmdDispPick, cmdDispSetFolder);
+  context.subscriptions.push(cmdDisp1, cmdDisp2, cmdDispPrev, cmdDispNext, cmdDispToggle, cmdDispRandom, cmdDispPick, cmdDispSetFolder);
 
   let btn1 = window.createStatusBarItem("backgroundimage.statusbar.prev", vscode.StatusBarAlignment.Right, 5);
   let btn2 = window.createStatusBarItem("backgroundimage.statusbar.toggle", vscode.StatusBarAlignment.Right, 4);
   let btn3 = window.createStatusBarItem("backgroundimage.statusbar.next", vscode.StatusBarAlignment.Right, 3);
-  let btn4 = window.createStatusBarItem("backgroundimage.statusbar.next", vscode.StatusBarAlignment.Right, 2);
+  let btn4 = window.createStatusBarItem("backgroundimage.statusbar.pickimage", vscode.StatusBarAlignment.Right, 2);
 
   btn1.text = "$(triangle-left)";
   btn1.command = 'backgroundimage.cmd.prev';
@@ -217,10 +224,25 @@ async function activate(context) {
     element.show();
   });
 
-
+  this.timerImageUpdate = null;
   workspace.onDidChangeConfiguration(evt => {
     if (evt.affectsConfiguration('backgroundimage.folder')) {
       cachedImageList = null;
+    }
+    if (evt.affectsConfiguration('backgroundimage.randomDelay')) {
+      if (this.timerImageUpdate !== null) {
+        clearInterval(this.timerImageUpdate);
+        this.timerImageUpdate = null;
+      }
+      const configValue = workspace.getConfiguration().get('backgroundimage.randomDelay', undefined);
+      if (typeof (configValue) === 'number' && configValue > 0) {
+        this.timerImageUpdate = setInterval(async () => {
+          const isEnabled = workspace.getConfiguration().get('backgroundimage.enabled', true);
+          if (isEnabled) {
+            await commands.executeCommand('backgroundimage.cmd.pickRandom');
+          }
+        }, configValue * 1000);
+      }
     }
     if (evt.affectsConfiguration('backgroundimage.enabled')) {
       lazyGetRPCChannel().then(rpc=>{
@@ -259,6 +281,15 @@ async function activate(context) {
           wsConfig.update('backgroundimage.image', 'https://w.wallhaven.cc/full/j3/wallhaven-j3wqwm.jpg');
           window.showInformationMessage('You can now set a background image folder', {}, 'Set image folder', 'Ignore');
         }, 1500);
+      }
+      const configValue = workspace.getConfiguration().get('backgroundimage.randomDelay', undefined);
+      if (typeof (configValue) === 'number' && configValue > 0) {
+        this.timerImageUpdate = setInterval(async () => {
+          const isEnabled = workspace.getConfiguration().get('backgroundimage.enabled', true);
+          if (isEnabled) {
+            await commands.executeCommand('backgroundimage.cmd.pickRandom');
+          }
+        }, configValue * 1000);
       }
     }
   });

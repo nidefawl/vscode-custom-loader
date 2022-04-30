@@ -5,7 +5,7 @@
   "author": "nidefawl",
   "publisher": "nidefawl",
   "license": "MIT",
-  "version": "0.0.7",
+  "version": "0.1.2",
   "private": true,
   "repository": {
     "type": "git",
@@ -58,6 +58,11 @@
         "category": "Background-Image"
       },
       {
+        "command": "backgroundimage.cmd.pickRandom",
+        "title": "Select a random background image",
+        "category": "Background-Image"
+      },
+      {
         "command": "backgroundimage.cmd.pickimage",
         "title": "Pick background image",
         "category": "Background-Image"
@@ -82,6 +87,11 @@
           "backgroundimage.folder": {
             "type": "string",
             "markdownDescription": "Use the quick pick command to pick any image from the image folder"
+          },
+          "backgroundimage.randomDelay": {
+            "type": "integer",
+            "default": 0,
+            "markdownDescription": "Delay in seconds after which a random background image is loaded"
           },
           "backgroundimage.image": {
             "type": "string",
