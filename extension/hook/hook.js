@@ -502,7 +502,8 @@ exports.bootstrapWindow = () => {
         await storageService.initializationPromise;
 
         /* StorageService global storage allows access to extensions 'Mementos'     */
-        extStateJson = storageService.globalStorage.get('nidefawl.vscode-custom-loader', undefined);
+        const storage = storageService.globalStorage ? storageService.globalStorage : storageService.profileStorage;
+        extStateJson = storage.get('nidefawl.vscode-custom-loader', undefined);
 
         if (extStateJson !== undefined) {
           const extState = JSON.parse(extStateJson);

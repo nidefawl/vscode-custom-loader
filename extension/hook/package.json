@@ -3,7 +3,7 @@
   "description": "npm module providing hooks used by VSCode Custom Loader extension",
   "author": "nidefawl",
   "license": "MIT",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "main": "hook.js",
   "repository": {
