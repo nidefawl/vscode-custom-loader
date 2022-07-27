@@ -219,16 +219,22 @@ copy /Y "${patchedBootstrap}" "${pathBoostrapWindowJs}"
       }
       let scriptCommand = scriptFile;
       if (!isWindows) scriptCommand = `/bin/sh ${scriptCommand}`;
+      extensionLog(`Executing ${scriptCommand}`);
       sudo.exec(scriptCommand, {name: 'VSCode CustomLoader Boostrap Patcher'},
         async function(error, stdout, stderr) {
-          if (error) throw error;
-          extensionLog(`Patched ${pathBoostrapWindowJs} to load ${pathHookModule}`);
-          vscode.window.showInformationMessage('Patched bootstrap-window.js. Please reload the window', {}, 'Reload window', 'Ignore').
-            then((response)=>{
-              if (response == 'Reload window') {
-                return vscode.commands.executeCommand('workbench.action.reloadWindow');
-              }
-            });
+          if (error) {
+            extensionLog(`Error ${error}`);
+            extensionLog(`stdout ${stdout}`);
+            extensionLog(`stderr ${stderr}`);
+          } else {
+            extensionLog(`Patched ${pathBoostrapWindowJs} to load ${pathHookModule}`);
+            vscode.window.showInformationMessage('Patched bootstrap-window.js. Please reload the window', {}, 'Reload window', 'Ignore').
+              then((response)=>{
+                if (response == 'Reload window') {
+                  return vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+              });
+          }
         }
       );
       return undefined;
