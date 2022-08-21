@@ -166,7 +166,7 @@ class VsCodeCustomizeExtension {
       const pathVsCodeInstallation = require.main.path;
       const pathBoostrapWindowJs = njspath.join(pathVsCodeInstallation, 'bootstrap-window.js');
       const pathBoostrapWindowJsBak = njspath.join(pathVsCodeInstallation, 'bootstrap-window.js.without-customloader');
-      const pathPatchTemplate = this.ctxt.asAbsolutePath('patch/bootstrap-window-patch.js');
+      const pathPatchTemplate = this.ctxt.asAbsolutePath(`patch${njspath.sep}bootstrap-window-patch.js`);
       let pathHookModule = this.ctxt.asAbsolutePath('hook');
       if (njspath.sep != njspath.posix.sep) // replace backslash with forward on win32
         pathHookModule = pathHookModule.split(njspath.sep).join(njspath.posix.sep);
@@ -200,9 +200,9 @@ class VsCodeCustomizeExtension {
       const isWindows = os.platform() === 'win32';
       const scriptExtension = isWindows ? "cmd" : "sh"
       const osTempDir = os.tmpdir();
-      const tempdir = njsfs.mkdtempSync(`${osTempDir}${njspath.posix.sep}`);
-      const scriptFile = [tempdir, `patch.${scriptExtension}`].join(njspath.posix.sep);
-      const patchedBootstrap = [tempdir, 'bootstrap-window.js'].join(njspath.posix.sep);
+      const tempdir = njsfs.mkdtempSync(`${osTempDir}${njspath.sep}`);
+      const scriptFile = [tempdir, `patch.${scriptExtension}`].join(njspath.sep);
+      const patchedBootstrap = [tempdir, 'bootstrap-window.js'].join(njspath.sep);
       njsfs.writeFileSync(patchedBootstrap, contentsPatched, {encoding: 'utf8', flag: 'w'});
       if (!isWindows) {
         njsfs.writeFileSync(scriptFile, `#!/bin/sh\n
