@@ -1,5 +1,5 @@
 const vscode = require('vscode');
-const nodeFsPath = require('path');
+const nodeFsPath = require('path'); // this should not be possible. I think it no longer is in sandbox mode
 const { commands, workspace, window, Uri } = vscode;
 
 const moduleList = [
